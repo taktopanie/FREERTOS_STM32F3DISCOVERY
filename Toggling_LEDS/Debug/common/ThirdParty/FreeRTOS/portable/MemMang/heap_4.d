@@ -1,7 +1,7 @@
 common/ThirdParty/FreeRTOS/portable/MemMang/heap_4.o: \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/portable/MemMang/heap_4.c \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include/FreeRTOS.h \
- /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/FreeRTOSConfig.h \
+ ../Core/Inc/FreeRTOSConfig.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/OS/SEGGER_SYSVIEW_FreeRTOS.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER_SYSVIEW.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER.h \
@@ -17,7 +17,7 @@ common/ThirdParty/FreeRTOS/portable/MemMang/heap_4.o: \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include/task.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include/list.h
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include/FreeRTOS.h:
-/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/FreeRTOSConfig.h:
+../Core/Inc/FreeRTOSConfig.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/OS/SEGGER_SYSVIEW_FreeRTOS.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER_SYSVIEW.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER.h:

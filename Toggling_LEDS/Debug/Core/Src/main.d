@@ -28,7 +28,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim.h \
  ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim_ex.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include/FreeRTOS.h \
- /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/FreeRTOSConfig.h \
+ ../Core/Inc/FreeRTOSConfig.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/OS/SEGGER_SYSVIEW_FreeRTOS.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER_SYSVIEW.h \
  /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER.h \
@@ -73,7 +73,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim.h:
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim_ex.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include/FreeRTOS.h:
-/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/FreeRTOSConfig.h:
+../Core/Inc/FreeRTOSConfig.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/OS/SEGGER_SYSVIEW_FreeRTOS.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER_SYSVIEW.h:
 /home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER/SEGGER.h:
