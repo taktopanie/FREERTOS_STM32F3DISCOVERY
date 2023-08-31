@@ -54,11 +54,7 @@ static void MX_GPIO_Init(void);
 static void toggle_LED1_handler(void* parameters);
 static void toggle_LED2_handler(void* parameters);
 static void toggle_LED3_handler(void* parameters);
-static void toggle_LED4_handler(void* parameters);
-static void toggle_LED5_handler(void* parameters);
-static void toggle_LED6_handler(void* parameters);
-static void toggle_LED7_handler(void* parameters);
-static void toggle_LED8_handler(void* parameters);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -76,11 +72,6 @@ int main(void)
 	TaskHandle_t toggle_LED1_handle;
 	TaskHandle_t toggle_LED2_handle;
 	TaskHandle_t toggle_LED3_handle;
-//	TaskHandle_t toggle_LED4_handle;
-//	TaskHandle_t toggle_LED5_handle;
-//	TaskHandle_t toggle_LED6_handle;
-//	TaskHandle_t toggle_LED7_handle;
-//	TaskHandle_t toggle_LED8_handle;
 	BaseType_t Status;
   /* USER CODE END 1 */
 
@@ -118,23 +109,6 @@ int main(void)
 
   Status = xTaskCreate(toggle_LED3_handler, "Toggle LED 3", configMINIMAL_STACK_SIZE, "LED 3 toggled", 2, &toggle_LED3_handle );
   configASSERT(Status == pdPASS);
-
-//  Status = xTaskCreate(toggle_LED4_handler, "Toggle LED 4", configMINIMAL_STACK_SIZE, "LED 4 toggled", 2, &toggle_LED4_handle );
-//  configASSERT(Status == pdPASS);
-//
-//  Status = xTaskCreate(toggle_LED5_handler, "Toggle LED 5", configMINIMAL_STACK_SIZE, "LED 5 toggled", 2, &toggle_LED5_handle );
-//  configASSERT(Status == pdPASS);
-//
-//  Status = xTaskCreate(toggle_LED6_handler, "Toggle LED 6", configMINIMAL_STACK_SIZE, "LED 6 toggled", 2, &toggle_LED6_handle );
-//  configASSERT(Status == pdPASS);
-//
-//  Status = xTaskCreate(toggle_LED7_handler, "Toggle LED 7", configMINIMAL_STACK_SIZE, "LED 7 toggled", 2, &toggle_LED7_handle );
-//  configASSERT(Status == pdPASS);
-//
-//  Status = xTaskCreate(toggle_LED8_handler, "Toggle LED 8", configMINIMAL_STACK_SIZE, "LED 8 toggled", 2, &toggle_LED8_handle );
-//  configASSERT(Status == pdPASS);
-
-
 
   //START SCHEDULER
   vTaskStartScheduler();
@@ -268,19 +242,24 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 static void toggle_LED1_handler(void* parameters){
 
+	TickType_t xLastWakeTime;
+	const TickType_t xFrequency = pdMS_TO_TICKS(1000);
+	xLastWakeTime = xTaskGetTickCount();
 //	char msg[100];
 	while(1){
 		//printf("%s\n", (char*) parameters);
 //		snprintf(msg, 100, "%s\n", (char*)parameters);
 //		SEGGER_SYSVIEW_PrintfTarget(msg);
 		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_8);
-		vTaskDelay(5);
+		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 		//taskYIELD();
 	}
 }
 
 static void toggle_LED2_handler(void* parameters){
-
+	TickType_t xLastWakeTime;
+	const TickType_t xFrequency = pdMS_TO_TICKS(500);
+	xLastWakeTime = xTaskGetTickCount();
 //	char msg[100];
 	while(1){
 		//printf("%s\n", (char*) parameters);
@@ -288,85 +267,22 @@ static void toggle_LED2_handler(void* parameters){
 //		SEGGER_SYSVIEW_PrintfTarget(msg);
 		//taskYIELD();
 		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_9);
-		vTaskDelay(10);
+		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 	}
 }
 
 static void toggle_LED3_handler(void* parameters){
-
+	TickType_t xLastWakeTime;
+	const TickType_t xFrequency = pdMS_TO_TICKS(250);
+	xLastWakeTime = xTaskGetTickCount();
 //	char msg[100];
 	while(1){
+		//printf("%s\n", (char*) parameters);
+//		snprintf(msg, 100, "%s\n", (char*)parameters);
+//		SEGGER_SYSVIEW_PrintfTarget(msg);
+		//taskYIELD();
 		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_10);
-		vTaskDelay(15);
-		//printf("%s\n", (char*) parameters);
-//		snprintf(msg, 100, "%s\n", (char*)parameters);
-//		SEGGER_SYSVIEW_PrintfTarget(msg);
-		//taskYIELD();
-	}
-}
-
-static void toggle_LED4_handler(void* parameters){
-
-//	char msg[100];
-	while(1){
-		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_11);
-		vTaskDelay(1500);
-		//printf("%s\n", (char*) parameters);
-//		snprintf(msg, 100, "%s\n", (char*)parameters);
-//		SEGGER_SYSVIEW_PrintfTarget(msg);
-		//taskYIELD();
-	}
-}
-
-static void toggle_LED5_handler(void* parameters){
-
-//	char msg[100];
-	while(1){
-		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_12);
-		vTaskDelay(1000);
-		//printf("%s\n", (char*) parameters);
-//		snprintf(msg, 100, "%s\n", (char*)parameters);
-//		SEGGER_SYSVIEW_PrintfTarget(msg);
-		//taskYIELD();
-	}
-}
-
-static void toggle_LED6_handler(void* parameters){
-
-//	char msg[100];
-	while(1){
-		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_13);
-		vTaskDelay(500);
-		//printf("%s\n", (char*) parameters);
-//		snprintf(msg, 100, "%s\n", (char*)parameters);
-//		SEGGER_SYSVIEW_PrintfTarget(msg);
-		//taskYIELD();
-	}
-}
-
-static void toggle_LED7_handler(void* parameters){
-
-//	char msg[100];
-	while(1){
-		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_14);
-		vTaskDelay(250);
-		//printf("%s\n", (char*) parameters);
-//		snprintf(msg, 100, "%s\n", (char*)parameters);
-//		SEGGER_SYSVIEW_PrintfTarget(msg);
-		//taskYIELD();
-	}
-}
-
-static void toggle_LED8_handler(void* parameters){
-
-//	char msg[100];
-	while(1){
-		HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_15);
-		vTaskDelay(100);
-		//printf("%s\n", (char*) parameters);
-//		snprintf(msg, 100, "%s\n", (char*)parameters);
-//		SEGGER_SYSVIEW_PrintfTarget(msg);
-		//taskYIELD();
+		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 	}
 }
 
