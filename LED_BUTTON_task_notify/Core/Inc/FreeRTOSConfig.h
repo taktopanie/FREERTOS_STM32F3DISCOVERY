@@ -126,5 +126,7 @@ standard names. */
 //DODANE PRZEZE MNIE
 #include "SEGGER_SYSVIEW_FreeRTOS.h"
 
+#define INCLUDE_eTaskGetState	1
+
 #endif /* FREERTOS_CONFIG_H */
 

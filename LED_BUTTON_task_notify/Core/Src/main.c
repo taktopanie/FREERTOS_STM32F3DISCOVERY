@@ -38,9 +38,14 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define LED_GREEN 	GPIO_PIN_15
-#define LED_BLUE 	GPIO_PIN_12
-#define LED_RED		GPIO_PIN_13
+#define LED_GREEN_1 	GPIO_PIN_15
+#define LED_GREEN_2 	GPIO_PIN_11
+#define LED_ORANGE_1 	GPIO_PIN_14
+#define LED_ORANGE_2 	GPIO_PIN_10
+#define LED_BLUE_1 		GPIO_PIN_12
+#define LED_BLUE_2 		GPIO_PIN_8
+#define LED_RED_1		GPIO_PIN_13
+#define LED_RED_2		GPIO_PIN_9
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -53,19 +58,24 @@
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
-static void toggle_GREEN_handler(void* parameters);
-static void toggle_BLUE_handler(void* parameters);
-static void toggle_RED_handler(void* parameters);
+static void toggle_1_handler(void* parameters);
+static void toggle_2_handler(void* parameters);
+static void toggle_3_handler(void* parameters);
+static void toggle_4_handler(void* parameters);
+static void ALL_LEDS_ON_handler(void* parameters);
 static void button_press_handler(void* parameters);
+
 
 TaskHandle_t volatile next_task_handle;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-TaskHandle_t toggle_GREEN_handle;
-TaskHandle_t toggle_BLUE_handle;
-TaskHandle_t toggle_RED_handle;
+TaskHandle_t toggle_1_handle;
+TaskHandle_t toggle_2_handle;
+TaskHandle_t toggle_3_handle;
+TaskHandle_t toggle_4_handle;
+TaskHandle_t LEDS_ON_handle;
 TaskHandle_t BTN_task_handle;
 /* USER CODE END 0 */
 
@@ -106,22 +116,29 @@ int main(void)
 
   SEGGER_SYSVIEW_Start();
 
-  Status = xTaskCreate(toggle_GREEN_handler, "Toggle GREEN LED", 200, "GREEN LED toggled", 3, &toggle_GREEN_handle );
+  Status = xTaskCreate(toggle_1_handler, "Toggle 1 LED", 200, "1 LED toggled", 1, &toggle_1_handle );
   configASSERT(Status == pdPASS);
 
-  next_task_handle = toggle_GREEN_handle;
+  next_task_handle = toggle_1_handle;
 
-  Status = xTaskCreate(toggle_BLUE_handler, "Toggle BLUE LED", 200, "BLUE LED toggled", 2, &toggle_BLUE_handle );
+  Status = xTaskCreate(toggle_2_handler, "Toggle 2 LED", 200, "2 LED toggled", 1, &toggle_2_handle );
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(toggle_RED_handler, "Toggle RED LED", 200, "RED LED toggled", 1, &toggle_RED_handle );
+  Status = xTaskCreate(toggle_3_handler, "Toggle 3 LED", 200, "3 LED toggled", 1, &toggle_3_handle );
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(button_press_handler, "Button task", 200, "Button pressed", 4, &BTN_task_handle );
+  Status = xTaskCreate(toggle_4_handler, "Toggle 4 LED", 200, "4 LED toggled", 1, &toggle_4_handle );
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(ALL_LEDS_ON_handler, "ALL LEDS ON", 200, "all leds on", 1, &LEDS_ON_handle );
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(button_press_handler, "Button task", 200, "Button pressed", 2, &BTN_task_handle );
   configASSERT(Status == pdPASS);
 
   //START SCHEDULER
   vTaskStartScheduler();
+  vTaskSuspend(LEDS_ON_handle);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -250,60 +267,138 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-static void toggle_GREEN_handler(void* parameters){
+static void toggle_1_handler(void* parameters){
 
 	BaseType_t status;
 	while(1){
-		SEGGER_SYSVIEW_PrintfTarget("Toggling GREEN LED");
-		HAL_GPIO_TogglePin(GPIOE, LED_GREEN);
+		SEGGER_SYSVIEW_PrintfTarget("Toggling 1 LED");
+		HAL_GPIO_TogglePin(GPIOE, LED_GREEN_1);
+		HAL_GPIO_TogglePin(GPIOE, LED_GREEN_2);
 		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(1000));
 
 		if(status == pdTRUE){
 			//the button was pressed
 			vTaskSuspendAll();
-			next_task_handle = toggle_BLUE_handle;
+			next_task_handle = toggle_2_handle;
 			xTaskResumeAll();
-			HAL_GPIO_WritePin(GPIOE, LED_GREEN, GPIO_PIN_SET);
-			vTaskDelete(NULL);
+
+			eTaskState state = eTaskGetState(toggle_1_handle);
+
+			if(state == eReady || state == eRunning){
+				HAL_GPIO_WritePin(GPIOE, LED_GREEN_1, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(GPIOE, LED_GREEN_2, GPIO_PIN_SET);
+				vTaskSuspend(NULL);
+
+			}else{
+			}
 		}
 	}
 }
 
-static void toggle_BLUE_handler(void* parameters){
+static void toggle_2_handler(void* parameters){
 
 	BaseType_t status;
 	while(1){
-		SEGGER_SYSVIEW_PrintfTarget("Toggling BLUE LED");
-		HAL_GPIO_TogglePin(GPIOE, LED_BLUE);
-		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(800));
-
-		if(status == pdTRUE){
-			//the button was pressed
-			vTaskSuspendAll();
-			next_task_handle = toggle_RED_handle;
-			xTaskResumeAll();
-			HAL_GPIO_WritePin(GPIOE, LED_BLUE, GPIO_PIN_SET);
-			vTaskDelete(NULL);
-		}
-	}
-}
-
-static void toggle_RED_handler(void* parameters){
-
-	BaseType_t status;
-	while(1){
-		SEGGER_SYSVIEW_PrintfTarget("Toggling RED LED");
-		HAL_GPIO_TogglePin(GPIOE, LED_RED);
+		SEGGER_SYSVIEW_PrintfTarget("Toggling 2 LED");
+		HAL_GPIO_TogglePin(GPIOE, LED_ORANGE_1);
+		HAL_GPIO_TogglePin(GPIOE, LED_ORANGE_2);
 		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(500));
 
 		if(status == pdTRUE){
 			//the button was pressed
 			vTaskSuspendAll();
-			next_task_handle = NULL;
+			next_task_handle = toggle_3_handle;
 			xTaskResumeAll();
-			HAL_GPIO_WritePin(GPIOE, LED_RED, GPIO_PIN_SET);
-			vTaskDelete(BTN_task_handle);
-			vTaskDelete(NULL);
+
+			eTaskState state = eTaskGetState(toggle_2_handle);
+
+			if(state == eReady || state == eRunning){
+				HAL_GPIO_WritePin(GPIOE, LED_ORANGE_1, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(GPIOE, LED_ORANGE_2, GPIO_PIN_SET);
+				vTaskSuspend(NULL);
+
+			}else{
+			}
+		}
+	}
+}
+
+static void toggle_3_handler(void* parameters){
+
+	BaseType_t status;
+	while(1){
+		SEGGER_SYSVIEW_PrintfTarget("Toggling 3 LED");
+		HAL_GPIO_TogglePin(GPIOE, LED_RED_1);
+		HAL_GPIO_TogglePin(GPIOE, LED_RED_2);
+		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(250));
+
+		if(status == pdTRUE){
+			//the button was pressed
+			vTaskSuspendAll();
+			next_task_handle = toggle_4_handle;
+			xTaskResumeAll();
+
+			eTaskState state = eTaskGetState(toggle_3_handle);
+
+			if(state == eReady || state == eRunning){
+				HAL_GPIO_WritePin(GPIOE, LED_RED_1, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(GPIOE, LED_RED_2, GPIO_PIN_SET);
+				vTaskSuspend(NULL);
+
+			}else{
+			}
+		}
+	}
+}
+
+static void toggle_4_handler(void* parameters){
+
+	BaseType_t status;
+	while(1){
+		SEGGER_SYSVIEW_PrintfTarget("Toggling 4 LED");
+		HAL_GPIO_TogglePin(GPIOE, LED_BLUE_1);
+		HAL_GPIO_TogglePin(GPIOE, LED_BLUE_2);
+
+		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(125));
+
+		if(status == pdTRUE){
+			//the button was pressed
+			vTaskSuspendAll();
+			next_task_handle = LEDS_ON_handle;
+			xTaskResumeAll();
+
+
+			eTaskState state = eTaskGetState(toggle_4_handle);
+
+			if(state == eReady || state == eRunning){
+				HAL_GPIO_WritePin(GPIOE, LED_BLUE_1, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(GPIOE, LED_BLUE_2, GPIO_PIN_SET);
+				vTaskResume(LEDS_ON_handle);
+				vTaskSuspend(NULL);
+			}else{
+			}
+		}
+	}
+}
+
+static void ALL_LEDS_ON_handler(void* parameters){
+
+	BaseType_t status;
+	while(1){
+		SEGGER_SYSVIEW_PrintfTarget("LEDS ON");
+		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(500));
+
+		if(status == pdTRUE){
+			//the button was pressed
+			vTaskSuspendAll();
+			next_task_handle = toggle_1_handle;
+			xTaskResumeAll();
+
+				vTaskResume(toggle_1_handle);
+				vTaskResume(toggle_2_handle);
+				vTaskResume(toggle_3_handle);
+				vTaskResume(toggle_4_handle);
+				vTaskSuspend(NULL);
 		}
 	}
 }
