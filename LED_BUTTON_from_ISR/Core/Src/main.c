@@ -384,7 +384,7 @@ static void MX_GPIO_Init(void)
 
 void button_interrupt_handler(void){
 	traceISR_ENTER();
-	xTaskNotifyFromISR(next_task_handle, 0, 0, NULL);
+	xTaskNotifyFromISR(next_task_handle, 0, eNoAction, NULL);
 	traceISR_EXIT();
 }
 
