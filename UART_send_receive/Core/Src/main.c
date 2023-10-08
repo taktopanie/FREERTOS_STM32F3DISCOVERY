@@ -55,6 +55,8 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 
+UART_HandleTypeDef huart3;
+
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
@@ -69,6 +71,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void LED_TOGGLE_handler(void* parameters);
 static void Blocking_task_handler(void* parameters);
@@ -77,7 +80,7 @@ void MyIrq(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+uint8_t rx_buff [100];
 /* USER CODE END 0 */
 
 /**
@@ -112,6 +115,7 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_USB_PCD_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
 	DWT_CTRL |= (1 << 0);
@@ -130,6 +134,7 @@ int main(void)
 
 	//START SCHEDULER
 	vTaskStartScheduler();
+
 
   /* USER CODE END 2 */
 
@@ -183,7 +188,9 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_I2C1;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_USART3
+                              |RCC_PERIPHCLK_I2C1;
+  PeriphClkInit.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
   PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
@@ -281,6 +288,41 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 38400;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * @brief USB Initialization Function
   * @param None
   * @retval None
@@ -368,8 +410,18 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 static void LED_TOGGLE_handler(void* parameters){
 	TickType_t xLast_wakeup;
+	uint8_t data [3];
 	xLast_wakeup = xTaskGetTickCount();
 	while(1){
+//		if(HAL_UART_Receive(&huart3, data, 3, 5000)==HAL_OK){
+//			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, 1);
+//		}
+//		data[0] = 'L';
+//		data[1] = '0';
+//		data[2] = 'L';
+		HAL_UART_Receive_IT(&huart3, rx_buff, 3);
+//		HAL_UART_Transmit(&huart3, data, 3, 200);
+		printf("hello\n");
 		vTaskDelayUntil(&xLast_wakeup, (100 * portTICK_PERIOD_MS) );
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_15);
 		SEGGER_SYSVIEW_PrintfTarget("HELLO FROM Toggle TASK\n");
@@ -378,7 +430,10 @@ static void LED_TOGGLE_handler(void* parameters){
 
 static void Blocking_task_handler (void* parameters){
 	BaseType_t status;
+	uint8_t data [] = "Blocking\n";
+	HAL_UART_Transmit(&huart3, data, 9, 200);
 	while(1){
+
 		status = xTaskNotifyWait(0,0,NULL,2);
 		if(status == pdTRUE){
 
@@ -397,6 +452,14 @@ void MyIrq(void){
 	SEGGER_SYSVIEW_PrintfTarget("HELLO FROM IRQ\n");
 	//vTaskSuspend(Blocking_task_handle);
 	xTaskNotifyFromISR(Blocking_task_handle, 0, eNoAction, 0);
+}
+
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
+	 HAL_UART_Receive_IT(&huart3, rx_buff, 3);
+	 if(rx_buff[0]=='q'){
+		 HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
+	 }
 }
 
 /* USER CODE END 4 */
