@@ -38,6 +38,34 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+typedef struct {
+	uint8_t payload[10];
+	uint8_t len;
+}command_t;
+
+typedef enum{
+	sMainMenu = 0,
+	sLedEffect,
+	sRtcMenu,
+	sRtcTimeConfig,
+	sRtcDateConfig,
+	sRtcReport,
+}state_t;
+
+/* USER CODE BEGIN PV */
+extern TaskHandle_t LED_handle;
+extern TaskHandle_t MENU_handle;
+extern TaskHandle_t RTC_handle;
+extern TaskHandle_t PRINT_handle;
+extern TaskHandle_t COMMAND_handle;
+
+extern QueueHandle_t q_data;
+extern QueueHandle_t q_print;
+
+//volatile uint8_t user_data;
+extern state_t curr_state;
+
+
 
 /* USER CODE END ET */
 
@@ -60,6 +88,13 @@ void MENU_task_handler(void* parameters);
 void RTC_task_handler(void* parameters);
 void PRINT_task_handler(void* parameters);
 void COMMAND_task_handler(void* parameters);
+
+void process_command(command_t *cmd);
+int extract_command(command_t *cmd);
+
+void led_effect_stop(void);
+void led_effect(int e);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

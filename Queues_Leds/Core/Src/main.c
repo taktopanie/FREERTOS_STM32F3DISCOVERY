@@ -22,7 +22,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,7 +63,11 @@ TaskHandle_t COMMAND_handle;
 QueueHandle_t q_data;
 QueueHandle_t q_print;
 
-volatile uint8_t user_data;
+//volatile uint8_t user_data;
+uint8_t user_data;
+
+//state variable
+state_t curr_state = sMainMenu;
 
 /* USER CODE END PV */
 
@@ -357,69 +360,40 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void LED_task_handler(void* parameters){
-
-	while(1){
-
-	}
-}
-
-void MENU_task_handler (void* parameters){
-
-	while(1){
-
-	}
-
-}
-
-void RTC_task_handler (void* parameters){
-
-	while(1){
-
-	}
-
-}
-
-void PRINT_task_handler (void* parameters){
-
-	while(1){
-
-	}
-
-}
-
-void COMMAND_task_handler (void* parameters){
-
-	while(1){
-
-	}
-
-}
-
-void MyIrq(void){
 
 
-}
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	if(xQueueIsQueueFullFromISR(q_data)){
+	uint8_t dummy;
+
+	if(! xQueueIsQueueFullFromISR(q_data)){
 		//QUEUE IS NOT FULL
-		//TODO: enqueue data byte
+
+		// enqueue data byte
+		xQueueReceiveFromISR(q_data, (void*)&user_data, NULL);
+
 	}else{
 		//QUEUE IS FULL
-		//if(/*TODO: check, is user_data == '\n' */){
-			//user_data == '/n'
-			//TODO: make sure that last data byte of the queue is '\n' ?
-
-		//}
+		//check, is user_data == '\n'
+		if(user_data == '\n'){
+			//make sure that last data byte of the queue is '\n'
+			xQueueSendFromISR(q_data,(void*)&dummy, NULL);
+			xQueueReceiveFromISR(q_data, (void*)&user_data, NULL);
+		}
 
 	}
 
-	//TODO: send notification to command handling task if user_data == '\n'
+	//send notification to command handling task if user_data == '\n'
+	if( user_data == '\n'){
+		xTaskNotifyFromISR(COMMAND_handle, 0, eNoAction, NULL);
+	}
 
-	//TODO: Enable UART data byte recepction again in IT mode
+	//Enable UART data byte recepction again in IT mode
+	HAL_UART_Receive_IT(&huart3, &user_data, 1);
 
 }
+
+
 /* USER CODE END 4 */
 
 /**
@@ -441,6 +415,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 1 */
 
   /* USER CODE END Callback 1 */
+
 }
 
 /**
