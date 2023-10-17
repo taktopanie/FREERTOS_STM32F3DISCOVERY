@@ -16,10 +16,9 @@ void LED_task_handler(void* parameters){
 							"|      LED effects      \n"
 							"========================\n"
 							"(NONE,e1,e2,e3,e4)\n"
-							"|         MENU         |\n"
 							"Enter your choice here : ";
 
-	const char* msg_invalid="========================\n"
+	const char* msg_invalid="\n========================\n"
 						  	"|    invalid option    |\n"
 							"========================\n";
 	while(1){
@@ -31,7 +30,7 @@ void LED_task_handler(void* parameters){
 		xQueueSend(q_print,&msg_led, portMAX_DELAY);
 
 		//wait for LED command (notify wait)
-		xTaskNotifyWait(0,0,&cmd_addr,portMAX_DELAY);
+		xTaskNotifyWait(0, 0, &cmd_addr, portMAX_DELAY);
 
 		cmd = (command_t*)cmd_addr;
 
@@ -72,7 +71,7 @@ void MENU_task_handler (void* parameters){
 							"Exit           ----> 2  \n"
 							"Enter your choice here : ";
 
-	const char* msg_invalid="========================\n"
+	const char* msg_invalid="\n========================\n"
 						  	"|    invalid option    |\n"
 							"========================\n";
 
@@ -83,7 +82,9 @@ void MENU_task_handler (void* parameters){
 
 		xTaskNotifyWait(0,0, &cmd_addr, portMAX_DELAY);
 
+
 		cmd = (command_t*)cmd_addr;
+		xQueueSend(q_print, &cmd, portMAX_DELAY);
 
 		if(cmd->len == 1){
 			//converting ascii to number
@@ -93,19 +94,20 @@ void MENU_task_handler (void* parameters){
 			case 0:
 				curr_state = sLedEffect;
 				xTaskNotify(LED_handle, 0, eNoAction);
-			break;
+				break;
 
 			case 1:
 				curr_state = sRtcMenu;
 				xTaskNotify(RTC_handle, 0, eNoAction);
-			break;
+				break;
 
 			case 2:
 				//implement exit;
-			break;
+				break;
 
 			default:
 				xQueueSend(q_print, &msg_invalid, portMAX_DELAY);
+				continue;
 			}
 
 		}else{
@@ -122,7 +124,7 @@ void MENU_task_handler (void* parameters){
 }
 
 void RTC_task_handler (void* parameters){
-
+	xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
 	while(1){
 
 	}
@@ -130,8 +132,10 @@ void RTC_task_handler (void* parameters){
 }
 
 void PRINT_task_handler (void* parameters){
-
+	uint32_t *msg;
 	while(1){
+		xQueueReceive(q_print, &msg, portMAX_DELAY);
+		HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen((char*)msg), HAL_MAX_DELAY);
 
 	}
 
@@ -175,7 +179,7 @@ void process_command(command_t *cmd){
 	case sRtcTimeConfig:
 	case sRtcDateConfig:
 	case sRtcReport:
-		xTaskNotify(COMMAND_handle, (uint32_t)cmd, eSetValueWithOverwrite);
+		xTaskNotify(RTC_handle, (uint32_t)cmd, eSetValueWithOverwrite);
 		break;
 
 	}

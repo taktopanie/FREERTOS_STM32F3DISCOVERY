@@ -33,6 +33,7 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include"FreeRTOS.h"
 #include "task.h"
+#include "timers.h"
 #include "queue.h"
 /* USER CODE END Includes */
 
@@ -40,7 +41,7 @@ extern "C" {
 /* USER CODE BEGIN ET */
 typedef struct {
 	uint8_t payload[10];
-	uint8_t len;
+	uint32_t len;
 }command_t;
 
 typedef enum{
@@ -65,7 +66,9 @@ extern QueueHandle_t q_print;
 //volatile uint8_t user_data;
 extern state_t curr_state;
 
+extern TimerHandle_t handle_led_timer[4];
 
+extern UART_HandleTypeDef huart3;
 
 /* USER CODE END ET */
 
@@ -95,6 +98,12 @@ int extract_command(command_t *cmd);
 void led_effect_stop(void);
 void led_effect(int e);
 
+void led_effect_callback(TimerHandle_t xTimer);
+
+void LED_effect1(void);
+void LED_effect2(void);
+void LED_effect3(void);
+void LED_effect4(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

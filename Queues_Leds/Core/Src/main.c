@@ -64,10 +64,12 @@ QueueHandle_t q_data;
 QueueHandle_t q_print;
 
 //volatile uint8_t user_data;
-uint8_t user_data;
+volatile uint8_t user_data;
 
 //state variable
 state_t curr_state = sMainMenu;
+
+TimerHandle_t handle_led_timer[4];
 
 /* USER CODE END PV */
 
@@ -125,19 +127,19 @@ int main(void)
 
 	BaseType_t Status;
 
-	Status = xTaskCreate(MENU_task_handler, "MENU task", 200, "MENU task running", 1, &MENU_handle );
+	Status = xTaskCreate(MENU_task_handler, "MENU task", 250, "MENU task running", 1, &MENU_handle );
 	configASSERT(Status == pdPASS);
 
-	Status = xTaskCreate(LED_task_handler, "LED task", 100, "LED task running", 1, &LED_handle );
+	Status = xTaskCreate(LED_task_handler, "LED task", 250, "LED task running", 1, &LED_handle );
 	configASSERT(Status == pdPASS);
 
-	Status = xTaskCreate(RTC_task_handler, "RTC task", 100, "RTC task running", 1, &RTC_handle );
+	Status = xTaskCreate(RTC_task_handler, "RTC task", 250, "RTC task running", 1, &RTC_handle );
 	configASSERT(Status == pdPASS);
 
-	Status = xTaskCreate(PRINT_task_handler, "PRINT task", 100, "PRINT task running", 1, &PRINT_handle );
+	Status = xTaskCreate(PRINT_task_handler, "PRINT task", 250, "PRINT task running", 1, &PRINT_handle );
 	configASSERT(Status == pdPASS);
 
-	Status = xTaskCreate(COMMAND_task_handler, "COMMAND task", 100, "COMMAND task running", 1, &COMMAND_handle );
+	Status = xTaskCreate(COMMAND_task_handler, "COMMAND task", 250, "COMMAND task running", 1, &COMMAND_handle );
 	configASSERT(Status == pdPASS);
 
 	q_data = xQueueCreate(10, sizeof(char));
@@ -148,7 +150,12 @@ int main(void)
 
 	configASSERT(q_print != NULL);
 
-	HAL_UART_Receive_IT(&huart3, &user_data, 1);
+	for(int i = 0; i <4; i++){
+		//create software timers for LED effects
+		handle_led_timer[i] = xTimerCreate("led_timer", pdMS_TO_TICKS(500), pdTRUE, (void*)(i+1), led_effect_callback);
+	}
+
+	HAL_UART_Receive_IT(&huart3, (uint8_t*)&user_data, 1);
 
 	//START SCHEDULER
 	vTaskStartScheduler();
@@ -366,19 +373,21 @@ static void MX_GPIO_Init(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	uint8_t dummy;
 
+	for(uint32_t i = 0; i< 4000; i++);
+
 	if(! xQueueIsQueueFullFromISR(q_data)){
 		//QUEUE IS NOT FULL
 
 		// enqueue data byte
-		xQueueReceiveFromISR(q_data, (void*)&user_data, NULL);
+		xQueueSendFromISR(q_data, (void*)&user_data, NULL);
 
 	}else{
 		//QUEUE IS FULL
 		//check, is user_data == '\n'
 		if(user_data == '\n'){
 			//make sure that last data byte of the queue is '\n'
-			xQueueSendFromISR(q_data,(void*)&dummy, NULL);
-			xQueueReceiveFromISR(q_data, (void*)&user_data, NULL);
+			xQueueReceiveFromISR(q_data,(void*)&dummy, NULL);
+			xQueueSendFromISR(q_data, (void*)&user_data, NULL);
 		}
 
 	}
@@ -389,10 +398,31 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	}
 
 	//Enable UART data byte recepction again in IT mode
-	HAL_UART_Receive_IT(&huart3, &user_data, 1);
+	HAL_UART_Receive_IT(&huart3, (uint8_t*)&user_data, 1);
 
 }
 
+void led_effect_callback(TimerHandle_t xTimer){
+	int ID;
+
+	ID = (uint32_t) pvTimerGetTimerID(xTimer);
+
+	switch(ID){
+		case 1:
+			LED_effect1();
+			break;
+		case 2:
+			LED_effect2();
+			break;
+		case 3:
+			LED_effect3();
+			break;
+		case 4:
+			LED_effect4();
+			break;
+
+	}
+}
 
 /* USER CODE END 4 */
 
