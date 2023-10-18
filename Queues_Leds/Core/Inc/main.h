@@ -31,6 +31,8 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>
+#include <stdio.h>
 #include"FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
@@ -68,7 +70,11 @@ extern state_t curr_state;
 
 extern TimerHandle_t handle_led_timer[4];
 
+
 extern UART_HandleTypeDef huart3;
+
+extern TimerHandle_t rtc_timer;
+extern RTC_HandleTypeDef hrtc;
 
 /* USER CODE END ET */
 
@@ -99,11 +105,20 @@ void led_effect_stop(void);
 void led_effect(int e);
 
 void led_effect_callback(TimerHandle_t xTimer);
+void rtc_report_callback( TimerHandle_t xTimer );
+
 
 void LED_effect1(void);
 void LED_effect2(void);
 void LED_effect3(void);
 void LED_effect4(void);
+
+void show_time_date(void);
+void show_time_date_itm(void);
+void rtc_configure_time(RTC_TimeTypeDef *time);
+void rtc_configure_date(RTC_DateTypeDef *date);
+int validate_rtc_information(RTC_TimeTypeDef *time , RTC_DateTypeDef *date);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
