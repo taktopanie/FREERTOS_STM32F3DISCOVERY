@@ -32,6 +32,7 @@ void LED_task_handler(void* parameters){
 		//wait for LED command (notify wait)
 		xTaskNotifyWait(0, 0, &cmd_addr, portMAX_DELAY);
 
+
 		cmd = (command_t*)cmd_addr;
 
 		if(cmd->len <= 4){
@@ -84,7 +85,6 @@ void MENU_task_handler (void* parameters){
 
 
 		cmd = (command_t*)cmd_addr;
-		xQueueSend(q_print, &cmd, portMAX_DELAY);
 
 		if(cmd->len == 1){
 			//converting ascii to number
@@ -202,7 +202,7 @@ int extract_command(command_t *cmd){
 		if(status == pdTRUE){
 			cmd->payload[i++] = item;
 		}
-	}while(item != '\n');
+	}while(item != '\r');
 
 	cmd->payload[i-1] = '\0';
 	cmd->len = i-1;

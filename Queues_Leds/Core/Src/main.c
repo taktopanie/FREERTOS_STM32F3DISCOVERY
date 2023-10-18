@@ -373,7 +373,6 @@ static void MX_GPIO_Init(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	uint8_t dummy;
 
-	for(uint32_t i = 0; i< 4000; i++);
 
 	if(! xQueueIsQueueFullFromISR(q_data)){
 		//QUEUE IS NOT FULL
@@ -384,7 +383,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	}else{
 		//QUEUE IS FULL
 		//check, is user_data == '\n'
-		if(user_data == '\n'){
+		if(user_data == '\r'){
 			//make sure that last data byte of the queue is '\n'
 			xQueueReceiveFromISR(q_data,(void*)&dummy, NULL);
 			xQueueSendFromISR(q_data, (void*)&user_data, NULL);
@@ -393,7 +392,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	}
 
 	//send notification to command handling task if user_data == '\n'
-	if( user_data == '\n'){
+	if( user_data == '\r'){
 		xTaskNotifyFromISR(COMMAND_handle, 0, eNoAction, NULL);
 	}
 
@@ -445,7 +444,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 1 */
 
   /* USER CODE END Callback 1 */
-
 }
 
 /**
