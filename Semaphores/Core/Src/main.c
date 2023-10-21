@@ -71,12 +71,15 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
-static void vManagerTask (void *pvParameters);
-static void vEmployeeTask (void *pvParameters);
+//static void vManagerTask (void *pvParameters);
+//static void vEmployeeTask (void *pvParameters);
 
-static void EmployeeDoWork(unsigned char TicketId);
+//static void EmployeeDoWork(unsigned char TicketId);
 
 void printmsg(char *msg);
+
+void button_task(void);
+static void sema_task (void *pvParameters);
 
 /* USER CODE END PFP */
 
@@ -125,8 +128,8 @@ int main(void)
   MX_GPIO_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  vSemaphoreCreateBinary(xWork);
+  xWork = xSemaphoreCreateBinary();
+  //vSemaphoreCreateBinary(xWork);
 
   xWorkQueue = xQueueCreate(1, sizeof( unsigned int));
   BaseType_t Status;
@@ -135,10 +138,13 @@ int main(void)
   SEGGER_SYSVIEW_Start();
 
   if( (xWork != NULL) && (xWorkQueue != NULL)){
-	  Status = xTaskCreate(vManagerTask, "Manager" , 500 , NULL , 2, &manager_handle);
-	  configASSERT(Status == pdPASS);
+//	  Status = xTaskCreate(vManagerTask, "Manager" , 500 , NULL , 2, &manager_handle);
+//	  configASSERT(Status == pdPASS);
+//
+//	  Status = xTaskCreate(vEmployeeTask, "Employee" , 500 , NULL , 1, &employe_handle);
+//	  configASSERT(Status == pdPASS);
 
-	  Status = xTaskCreate(vEmployeeTask, "Employee" , 500 , NULL , 1, &employe_handle);
+	  Status = xTaskCreate(sema_task, "Semaphore_task" , 500 , NULL , 1, NULL);
 	  configASSERT(Status == pdPASS);
 
 	  vTaskStartScheduler();
@@ -157,7 +163,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	 // HAL_UART_Transmit(&huart3, (uint8_t*)taktopanie, 4, HAL_MAX_DELAY);
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -266,10 +272,8 @@ static void MX_GPIO_Init(void)
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
-                           MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT1_Pin
-                          |MEMS_INT2_Pin;
+  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -285,11 +289,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MISOA7_Pin */
   GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MISOA7_Pin;
@@ -315,61 +319,79 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-static void vManagerTask (void *pvParameters){
+//static void vManagerTask (void *pvParameters){
+//
+//	unsigned int xWorkTicketId;
+//	portBASE_TYPE xStatus;
+//
+//	xSemaphoreGive(xWork);
+//
+//	while(1){
+//		xWorkTicketId = (rand() & 0x1FF);
+//			xStatus = xQueueSend(xWorkQueue, &xWorkTicketId, portMAX_DELAY);
+//
+//			if( xStatus != pdPASS){
+//				sprintf(usr_msg, "Could not send to the queue. \r\n");
+//				printmsg(usr_msg);
+//			}else{
+//				vTaskDelay(pdMS_TO_TICKS(1000));
+//				xSemaphoreGive(xWork);
+//				taskYIELD();
+//			}
+//	}
+//
+//
+//}
 
-	unsigned int xWorkTicketId;
-	portBASE_TYPE xStatus;
+//static void EmployeeDoWork(unsigned char TicketId){
+//	sprintf(usr_msg, "Employee task : working on ticket id: %d\r\n", TicketId);
+//	printmsg(usr_msg);
+//	vTaskDelay(TicketId);
+//}
 
-	xSemaphoreGive(xWork);
+//static void vEmployeeTask (void *pvParameters){
+//
+//	unsigned char xWorkTicketId;
+//	portBASE_TYPE xStatus;
+//
+//	while(1){
+//		if(xSemaphoreTake(xWork, portMAX_DELAY)){
+//
+//		xStatus = xQueueReceive(xWorkQueue, &xWorkTicketId, 0);
+//
+//		if(xStatus == pdPASS){
+//			EmployeeDoWork(xWorkTicketId);
+//		}else{
+//			sprintf(usr_msg, "Employee task : Queue is empty, nothing to do.\r\n");
+//			printmsg(usr_msg);
+//		}
+//		}else{
+//			sprintf(usr_msg, "No semaphores.\r\n");
+//			printmsg(usr_msg);
+//		}
+//	}
+//}
+
+static void sema_task (void *pvParameters){
+
 
 	while(1){
-		xWorkTicketId = (rand() & 0x1FF);
-			xStatus = xQueueSend(xWorkQueue, &xWorkTicketId, portMAX_DELAY);
 
-			if( xStatus != pdPASS){
-				sprintf(usr_msg, "Could not send to the queue. \r\n");
-				printmsg(usr_msg);
-			}else{
-				vTaskDelay(pdMS_TO_TICKS(1000));
-				xSemaphoreGive(xWork);
-				taskYIELD();
-			}
-	}
-
-
-}
-
-static void EmployeeDoWork(unsigned char TicketId){
-	sprintf(usr_msg, "Employee task : working on ticket id: %d\r\n", TicketId);
-	printmsg(usr_msg);
-	vTaskDelay(TicketId);
-}
-
-static void vEmployeeTask (void *pvParameters){
-
-	unsigned char xWorkTicketId;
-	portBASE_TYPE xStatus;
-
-	while(1){
 		if(xSemaphoreTake(xWork, portMAX_DELAY)){
 
-		xStatus = xQueueReceive(xWorkQueue, &xWorkTicketId, 0);
+			sprintf(usr_msg, "sema_task\r\n");
+			printmsg(usr_msg);
+		}
 
-		if(xStatus == pdPASS){
-			EmployeeDoWork(xWorkTicketId);
-		}else{
-			sprintf(usr_msg, "Employee task : Queue is empty, nothing to do.\r\n");
-			printmsg(usr_msg);
-		}
-		}else{
-			sprintf(usr_msg, "No semaphores.\r\n");
-			printmsg(usr_msg);
-		}
 	}
 }
 
@@ -384,6 +406,12 @@ void printmsg(char *msg){
 		while ( __HAL_UART_GET_FLAG(&huart3, UART_FLAG_TC) != SET);
 
 
+
+}
+
+void button_task(void){
+
+	xSemaphoreGiveFromISR(xWork, NULL);
 
 }
 /* USER CODE END 4 */

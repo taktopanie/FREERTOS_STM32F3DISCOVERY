@@ -2,8 +2,8 @@
 <cdtprojectproperties>
   <section name="org.eclipse.cdt.internal.ui.wizards.settingswizards.IncludePaths">
     <language id="org.eclipse.cdt.core.assembly" name="s,S">
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/Config</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/Config</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER</includepath>
     </language>
     <language id="org.eclipse.cdt.core.gcc" name="C Source File">
       <includepath>Core/Inc</includepath>
@@ -11,12 +11,12 @@
       <includepath>Drivers/STM32F3xx_HAL_Driver/Inc</includepath>
       <includepath>Drivers/CMSIS/Device/ST/STM32F3xx/Include</includepath>
       <includepath>Drivers/CMSIS/Include</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/portable/GCC/ARM_CM4F</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/Config</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/OS</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER</includepath>
-      <includepath>/home/taktopanie/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/include</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS/portable/GCC/ARM_CM4F</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/Config</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/OS</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/SEGGER/SEGGER</includepath>
+      <includepath>/home/maciej/Desktop/moje/programming/STM32/RTOS_workspace/common/ThirdParty/FreeRTOS</includepath>
     </language>
     <language name="Object File"/>
   </section>
