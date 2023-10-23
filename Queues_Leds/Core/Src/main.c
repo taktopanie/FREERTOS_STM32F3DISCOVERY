@@ -70,6 +70,7 @@ volatile uint8_t user_data;
 state_t curr_state = sMainMenu;
 
 TimerHandle_t handle_led_timer[4];
+TimerHandle_t rtc_timer;
 
 /* USER CODE END PV */
 
@@ -154,6 +155,8 @@ int main(void)
 		//create software timers for LED effects
 		handle_led_timer[i] = xTimerCreate("led_timer", pdMS_TO_TICKS(500), pdTRUE, (void*)(i+1), led_effect_callback);
 	}
+
+	rtc_timer = xTimerCreate ("rtc_report_timer",pdMS_TO_TICKS(1000),pdTRUE,NULL,rtc_report_callback);
 
 	HAL_UART_Receive_IT(&huart3, (uint8_t*)&user_data, 1);
 
@@ -423,6 +426,11 @@ void led_effect_callback(TimerHandle_t xTimer){
 	}
 }
 
+void rtc_report_callback( TimerHandle_t xTimer )
+{
+	 show_time_date_itm();
+
+}
 /* USER CODE END 4 */
 
 /**
