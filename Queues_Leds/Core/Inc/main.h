@@ -62,6 +62,8 @@ extern TaskHandle_t RTC_handle;
 extern TaskHandle_t PRINT_handle;
 extern TaskHandle_t COMMAND_handle;
 
+extern TaskHandle_t LCD_handle;
+
 extern QueueHandle_t q_data;
 extern QueueHandle_t q_print;
 
@@ -97,6 +99,8 @@ void MENU_task_handler(void* parameters);
 void RTC_task_handler(void* parameters);
 void PRINT_task_handler(void* parameters);
 void COMMAND_task_handler(void* parameters);
+
+void LCD_task_handler(void* parameters);
 
 void process_command(command_t *cmd);
 int extract_command(command_t *cmd);

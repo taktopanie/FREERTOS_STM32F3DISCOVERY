@@ -60,6 +60,8 @@ TaskHandle_t RTC_handle;
 TaskHandle_t PRINT_handle;
 TaskHandle_t COMMAND_handle;
 
+TaskHandle_t LCD_handle;
+
 QueueHandle_t q_data;
 QueueHandle_t q_print;
 
@@ -141,6 +143,9 @@ int main(void)
 	configASSERT(Status == pdPASS);
 
 	Status = xTaskCreate(COMMAND_task_handler, "COMMAND task", 250, "COMMAND task running", 1, &COMMAND_handle );
+	configASSERT(Status == pdPASS);
+
+	Status = xTaskCreate(LCD_task_handler, "LCD task", 250, "LCD task running", 1, &LCD_handle );
 	configASSERT(Status == pdPASS);
 
 	q_data = xQueueCreate(10, sizeof(char));
@@ -310,11 +315,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
                            MEMS_INT2_Pin */
@@ -356,6 +366,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Alternate = GPIO_AF14_USB;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PD0 PD1 PD2 PD3
+                           PD5 PD6 PD7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pins : I2C1_SCL_Pin I2C1_SDA_Pin */
   GPIO_InitStruct.Pin = I2C1_SCL_Pin|I2C1_SDA_Pin;

@@ -8,6 +8,7 @@
 
 #include "main.h"
 #include <string.h>
+#include <HD44780.h>
 
 const char* msg_invalid="\n========================\n"
 					  	"|    invalid option    |\n"
@@ -26,6 +27,8 @@ void LED_task_handler(void* parameters){
 
 		//wait for notify
 		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
+
+		xTaskNotify(LCD_handle, 0, eNoAction);
 
 		//print led menu
 		xQueueSend(q_print,&msg_led, portMAX_DELAY);
@@ -76,8 +79,10 @@ void MENU_task_handler (void* parameters){
 
 	while(1){
 		xQueueSend(q_print, &msg_menu, portMAX_DELAY);
-
+		//change curr state
+		xTaskNotify(LCD_handle, 0, eNoAction);
 		xTaskNotifyWait(0,0, &cmd_addr, portMAX_DELAY);
+
 
 
 		cmd = (command_t*)cmd_addr;
@@ -183,6 +188,8 @@ void RTC_task_handler (void* parameters){
 		/*Notify wait (wait till someone notifies) */
 		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
 
+		xTaskNotify(LCD_handle, 0, eNoAction);
+
 		/*Print the menu and show current date and time information */
 		xQueueSend(q_print,&msg_rtc1,portMAX_DELAY);
 		show_time_date();
@@ -195,7 +202,7 @@ void RTC_task_handler (void* parameters){
 			xTaskNotifyWait(0,0,&cmd_addr,portMAX_DELAY);
 			cmd = (command_t*)cmd_addr;
 
-			switch(curr_state)
+			switch((uint8_t)curr_state)
 			{
 				case sRtcMenu:{
 					/*process RTC menu commands */
@@ -233,7 +240,7 @@ void RTC_task_handler (void* parameters){
 				case sRtcTimeConfig:{
 					/*get hh, mm, ss infor and configure RTC */
 					/*take care of invalid entries */
-					switch(rtc_state)
+					switch((uint8_t)rtc_state)
 						{
 							case HH_CONFIG:{
 								uint8_t hour = getnumber(cmd->payload , cmd->len);
@@ -448,4 +455,34 @@ int extract_command(command_t *cmd){
 	cmd->payload[i-1] = '\0';
 	cmd->len = i-1;
 	return 0;
+}
+
+
+void LCD_task_handler(void* parameters){
+
+	lcd_init();
+
+
+	while(1)
+	{
+		//vTaskSuspend(NULL);
+		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
+
+		//set cursor to 0x0
+		lcd_send_command(LCD_CLEAR);
+
+		switch((uint8_t)curr_state)
+		{
+		case 0:
+			lcd_send_text("MAIN MENU");
+			break;
+		case 1:
+			lcd_send_text("LED EFFECT");
+			break;
+		case 2:
+			lcd_send_text("RTC MENU");
+			break;
+		}
+
+	}
 }
