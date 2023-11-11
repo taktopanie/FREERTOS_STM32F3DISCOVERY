@@ -137,8 +137,9 @@ int main(void)
   configASSERT(Status == pdPASS);
 
   //START SCHEDULER
-  vTaskStartScheduler();
   vTaskSuspend(LEDS_ON_handle);
+  vTaskStartScheduler();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -278,9 +279,9 @@ static void toggle_1_handler(void* parameters){
 
 		if(status == pdTRUE){
 			//the button was pressed
-			vTaskSuspendAll();
+			taskENTER_CRITICAL();
 			next_task_handle = toggle_2_handle;
-			xTaskResumeAll();
+			taskEXIT_CRITICAL();
 
 			eTaskState state = eTaskGetState(toggle_1_handle);
 
@@ -306,9 +307,9 @@ static void toggle_2_handler(void* parameters){
 
 		if(status == pdTRUE){
 			//the button was pressed
-			vTaskSuspendAll();
+			taskENTER_CRITICAL();
 			next_task_handle = toggle_3_handle;
-			xTaskResumeAll();
+			taskEXIT_CRITICAL();
 
 			eTaskState state = eTaskGetState(toggle_2_handle);
 
@@ -334,9 +335,9 @@ static void toggle_3_handler(void* parameters){
 
 		if(status == pdTRUE){
 			//the button was pressed
-			vTaskSuspendAll();
+			taskENTER_CRITICAL();
 			next_task_handle = toggle_4_handle;
-			xTaskResumeAll();
+			taskEXIT_CRITICAL();
 
 			eTaskState state = eTaskGetState(toggle_3_handle);
 
@@ -363,10 +364,9 @@ static void toggle_4_handler(void* parameters){
 
 		if(status == pdTRUE){
 			//the button was pressed
-			vTaskSuspendAll();
+			taskENTER_CRITICAL();
 			next_task_handle = LEDS_ON_handle;
-			xTaskResumeAll();
-
+			taskEXIT_CRITICAL();
 
 			eTaskState state = eTaskGetState(toggle_4_handle);
 
@@ -390,9 +390,9 @@ static void ALL_LEDS_ON_handler(void* parameters){
 
 		if(status == pdTRUE){
 			//the button was pressed
-			vTaskSuspendAll();
+			taskENTER_CRITICAL();
 			next_task_handle = toggle_1_handle;
-			xTaskResumeAll();
+			taskEXIT_CRITICAL();
 
 				vTaskResume(toggle_1_handle);
 				vTaskResume(toggle_2_handle);
