@@ -21,15 +21,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <FreeRTOS.h>
-#include <task.h>
-#include <semphr.h>
-#include <queue.h>
-#include <string.h>
-#include <stdio.h>
-#include <stm32f3xx.h>
-
-#include <stdlib.h>
 
 /* USER CODE END Includes */
 
@@ -53,16 +44,14 @@
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-TaskHandle_t manager_handle = NULL;
-TaskHandle_t employe_handle = NULL;
-
-xSemaphoreHandle xWork;
+TaskHandle_t UART_handle = NULL;
+TaskHandle_t LCD_handle = NULL;
 
 xQueueHandle xWorkQueue;
 
-char usr_msg[250];
+xSemaphoreHandle xWork;
 
-char * taktopanie = "LOL\n";
+char usr_msg[250];
 
 /* USER CODE END PV */
 
@@ -131,18 +120,19 @@ int main(void)
   xWork = xSemaphoreCreateBinary();
   //vSemaphoreCreateBinary(xWork);
 
-  xWorkQueue = xQueueCreate(1, sizeof( unsigned int));
+  xWorkQueue = xQueueCreate(10, sizeof(char));
   BaseType_t Status;
 
-  SEGGER_SYSVIEW_Conf();
-  SEGGER_SYSVIEW_Start();
+  sprintf(usr_msg, "Program running... \r\n");
+  printmsg(usr_msg);
 
   if( (xWork != NULL) && (xWorkQueue != NULL)){
-//	  Status = xTaskCreate(vManagerTask, "Manager" , 500 , NULL , 2, &manager_handle);
-//	  configASSERT(Status == pdPASS);
-//
-//	  Status = xTaskCreate(vEmployeeTask, "Employee" , 500 , NULL , 1, &employe_handle);
-//	  configASSERT(Status == pdPASS);
+
+	  Status = xTaskCreate(UART_task, "UART_task" , 500 , NULL , 1, &UART_handle);
+	  configASSERT(Status == pdPASS);
+
+	  Status = xTaskCreate(LCD_task, "LCD_print_task" , 500 , NULL , 1, &LCD_handle);
+	  configASSERT(Status == pdPASS);
 
 	  Status = xTaskCreate(sema_task, "Semaphore_task" , 500 , NULL , 1, NULL);
 	  configASSERT(Status == pdPASS);
@@ -150,8 +140,9 @@ int main(void)
 	  vTaskStartScheduler();
   }
 
-  sprintf(usr_msg, "Queue/Sema create failed.. \r\n");
+  sprintf(usr_msg, "Task creation failed.. \r\n");
   printmsg(usr_msg);
+
 
 
   /* USER CODE END 2 */
@@ -266,11 +257,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
   GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
@@ -311,6 +307,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF14_USB;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PD0 PD1 PD2 PD3
+                           PD5 PD6 PD7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   /*Configure GPIO pins : I2C1_SCL_Pin I2C1_SDA_Pin */
   GPIO_InitStruct.Pin = I2C1_SCL_Pin|I2C1_SDA_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
@@ -328,58 +333,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-//static void vManagerTask (void *pvParameters){
-//
-//	unsigned int xWorkTicketId;
-//	portBASE_TYPE xStatus;
-//
-//	xSemaphoreGive(xWork);
-//
-//	while(1){
-//		xWorkTicketId = (rand() & 0x1FF);
-//			xStatus = xQueueSend(xWorkQueue, &xWorkTicketId, portMAX_DELAY);
-//
-//			if( xStatus != pdPASS){
-//				sprintf(usr_msg, "Could not send to the queue. \r\n");
-//				printmsg(usr_msg);
-//			}else{
-//				vTaskDelay(pdMS_TO_TICKS(1000));
-//				xSemaphoreGive(xWork);
-//				taskYIELD();
-//			}
-//	}
-//
-//
-//}
-
-//static void EmployeeDoWork(unsigned char TicketId){
-//	sprintf(usr_msg, "Employee task : working on ticket id: %d\r\n", TicketId);
-//	printmsg(usr_msg);
-//	vTaskDelay(TicketId);
-//}
-
-//static void vEmployeeTask (void *pvParameters){
-//
-//	unsigned char xWorkTicketId;
-//	portBASE_TYPE xStatus;
-//
-//	while(1){
-//		if(xSemaphoreTake(xWork, portMAX_DELAY)){
-//
-//		xStatus = xQueueReceive(xWorkQueue, &xWorkTicketId, 0);
-//
-//		if(xStatus == pdPASS){
-//			EmployeeDoWork(xWorkTicketId);
-//		}else{
-//			sprintf(usr_msg, "Employee task : Queue is empty, nothing to do.\r\n");
-//			printmsg(usr_msg);
-//		}
-//		}else{
-//			sprintf(usr_msg, "No semaphores.\r\n");
-//			printmsg(usr_msg);
-//		}
-//	}
-//}
 
 static void sema_task (void *pvParameters){
 
@@ -390,6 +343,7 @@ static void sema_task (void *pvParameters){
 
 			sprintf(usr_msg, "sema_task\r\n");
 			printmsg(usr_msg);
+			xTaskNotify(UART_handle, 0, eIncrement);
 		}
 
 	}

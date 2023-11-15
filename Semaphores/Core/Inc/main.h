@@ -31,11 +31,26 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <FreeRTOS.h>
+#include <task.h>
+#include <semphr.h>
+#include <queue.h>
+#include <string.h>
+#include <stdio.h>
+#include <stm32f3xx.h>
+#include <stdlib.h>
+
+#include "myTasks.h"
+
+#include "HD44780.h"
 
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+extern UART_HandleTypeDef huart3;
+extern xSemaphoreHandle xWork;
+extern xQueueHandle xWorkQueue;
 
 /* USER CODE END ET */
 
