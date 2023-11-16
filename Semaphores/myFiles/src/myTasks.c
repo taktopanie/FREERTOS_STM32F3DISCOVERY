@@ -32,7 +32,7 @@ void UART_task (void *pvParameters){
 		sprintf(msg, "UART task running %d, time...\n\r", (int)notify_task);
 		__UART_print(msg);
 
-		for(int i = 0; i < 20; i++){
+		for(int i = 0; i < strlen(msg_2); i++){
 			xQueueSend(xWorkQueue, &msg_2[i], portMAX_DELAY);
 		}
 
@@ -72,8 +72,8 @@ void LCD_task (void *pvParameters){
 			table[i] = '\0';
 		}
 
-		xQueueReset(xWorkQueue);
 		__UART_print(table);
+		__UART_print("\n");
 
 		i=0;
 
