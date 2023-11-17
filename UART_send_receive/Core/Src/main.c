@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include"FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,8 +62,8 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
-TaskHandle_t LED_TOGGLE_handle;
-TaskHandle_t Blocking_task_handle;
+TaskHandle_t UART_RX_handle;
+TaskHandle_t UART_TX_handle;
 
 /* USER CODE END PV */
 
@@ -72,15 +74,19 @@ static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_USART3_UART_Init(void);
+
 /* USER CODE BEGIN PFP */
-static void LED_TOGGLE_handler(void* parameters);
-static void Blocking_task_handler(void* parameters);
+static void UART_RX_handler(void* parameters);
+static void UART_TX_handler(void* parameters);
+
 void MyIrq(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint8_t rx_buff [100];
+
+xQueueHandle UART_queue;
 /* USER CODE END 0 */
 
 /**
@@ -126,11 +132,14 @@ int main(void)
 
 	BaseType_t Status;
 
-	Status = xTaskCreate(LED_TOGGLE_handler, "Toggle_1_LED", 200, "1 LED toggled", 3, &LED_TOGGLE_handle );
+	Status = xTaskCreate(UART_RX_handler, "UART_RX", 200, "UART_RX running", 3, &UART_RX_handle );
 	configASSERT(Status == pdPASS);
 
-	Status = xTaskCreate(Blocking_task_handler, "Blocking_task", 100, "Block running", 2, &Blocking_task_handle );
+	Status = xTaskCreate(UART_TX_handler, "UART_TX", 200, "UART_TX running", 3, &UART_TX_handle );
 	configASSERT(Status == pdPASS);
+
+	UART_queue = xQueueCreate(10, sizeof(size_t));
+	configASSERT(UART_queue != NULL);
 
 	//START SCHEDULER
 	vTaskStartScheduler();
@@ -408,58 +417,77 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-static void LED_TOGGLE_handler(void* parameters){
-	TickType_t xLast_wakeup;
-	uint8_t data [3];
-	xLast_wakeup = xTaskGetTickCount();
-	while(1){
-//		if(HAL_UART_Receive(&huart3, data, 3, 5000)==HAL_OK){
-//			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, 1);
-//		}
-//		data[0] = 'L';
-//		data[1] = '0';
-//		data[2] = 'L';
-		HAL_UART_Receive_IT(&huart3, rx_buff, 3);
-//		HAL_UART_Transmit(&huart3, data, 3, 200);
-		printf("hello\n");
-		vTaskDelayUntil(&xLast_wakeup, (100 * portTICK_PERIOD_MS) );
+static void UART_RX_handler(void* parameters)
+{
+	const char * welcome_text = "\nProgram is working\n";
+	uint8_t BUFF = 200;
+	char buffor [BUFF];
+
+	HAL_UART_Transmit(&huart3, (uint8_t*)welcome_text, strlen(welcome_text), 100);
+
+	while(1)
+	{
+		HAL_UART_Receive_IT(&huart3, rx_buff, 1);  ///////////this buffer may be increased in the future
+
+		for(int i = 0; i < BUFF; i++)
+		{
+
+			xTaskNotifyWait(0, 0, (uint32_t *)&buffor[i], portMAX_DELAY);
+			//checks buffor overflow
+			if(i == (BUFF-1))
+			{
+				configASSERT(buffor[i] == '\r');
+			}
+
+			if(buffor[i] == '\r')
+			{
+				break;
+			}
+
+
+		}
+
+		uint32_t * wsk_tmp = (uint32_t*)&buffor;
+		xQueueSend(UART_queue, (void*)&wsk_tmp, portMAX_DELAY);
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_15);
-		SEGGER_SYSVIEW_PrintfTarget("HELLO FROM Toggle TASK\n");
 	}
 }
 
-static void Blocking_task_handler (void* parameters){
-	BaseType_t status;
-	uint8_t data [] = "Blocking\n";
-	HAL_UART_Transmit(&huart3, data, 9, 200);
-	while(1){
 
-		status = xTaskNotifyWait(0,0,NULL,2);
-		if(status == pdTRUE){
 
-			eTaskState state = eTaskGetState(Blocking_task_handle);
 
-			if(state == eRunning || state == eReady){
-				vTaskSuspend(NULL);
 
-			}
+static void UART_TX_handler(void* parameters){
+	uint8_t * wsk = NULL;
+	char * tmp = "\n";
+	while(1)
+	{
+		xQueueReceive(UART_queue, &wsk, portMAX_DELAY);
+		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
+
+
+
+		while(*wsk != '\r')
+		{
+			HAL_UART_Transmit(&huart3, wsk, 1, 100);
+			wsk +=1;
 		}
+
+		HAL_UART_Transmit(&huart3, (uint8_t*)tmp, 1, 100);
 	}
 }
 
 void MyIrq(void){
 	HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
-	SEGGER_SYSVIEW_PrintfTarget("HELLO FROM IRQ\n");
-	//vTaskSuspend(Blocking_task_handle);
-	xTaskNotifyFromISR(Blocking_task_handle, 0, eNoAction, 0);
 }
 
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	 HAL_UART_Receive_IT(&huart3, rx_buff, 3);
-	 if(rx_buff[0]=='q'){
-		 HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
-	 }
+	 HAL_UART_Receive_IT(&huart3, rx_buff, 1);
+	 xTaskNotifyFromISR(UART_RX_handle, *rx_buff, eSetValueWithOverwrite, NULL);
+//	 if(rx_buff[0]=='\r'){
+//		 HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
+//	 }
 }
 
 /* USER CODE END 4 */
