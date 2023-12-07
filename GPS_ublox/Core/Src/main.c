@@ -36,9 +36,14 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-
-//#define DEBUG_PRINT
-//#define TIMEZONE 1
+/*
+ * DEFINE IF YOU WANT TO BRIDGE THESE TWO UARTS -- MOSTLY USED DURING CONFIGURATION GPS RECEIVER
+ */
+//#define UART23_bridge
+/*
+ * DEFINE YOUR TIMEZONE HERE, IF NOT IT WILL PRINT UTC TIME
+ */
+#define TIME_ZONE 1
 
 /* USER CODE END PD */
 
@@ -52,10 +57,8 @@ UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-TaskHandle_t UART2_task;
+TaskHandle_t MSG_check_task;
 TaskHandle_t UART3_task;
-
-TaskHandle_t GPS_Position_task;
 
 uint8_t UART_2_buffor [10];
 uint8_t UART_3_buffor [10];
@@ -79,7 +82,7 @@ static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void printmsg(char *msg);
 
-void UART_2_handler(void * pvParameters);
+void MSG_check_handler(void * pvParameters);
 void UART_3_handler(void * pvParameters);
 
 
@@ -107,7 +110,7 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
-  Status = xTaskCreate(UART_2_handler , "UART2_task" , 200, "UART2 task running", 1, &UART2_task);
+  Status = xTaskCreate(MSG_check_handler , "MSG_check_task" , 200, "MSG checking", 1, &MSG_check_task);
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(UART_3_handler , "UART3_task" , 200, "UART3 task running", 1, &UART3_task);
@@ -131,15 +134,18 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  sprintf(send_text, "\n###############################\n#                             #\n"\
+		  "#      Program is running     #\n#   Waiting for GSP data...   #\n"\
+		  "#                             #\n###############################\n\n");
 
-
-
-  //HAL_UART_Transmit(&huart3, (uint8_t*)welcome_text, strlen(welcome_text), 100);
-  sprintf(send_text, "Program is running \r\n");
+  //send welcome text
   printmsg(send_text);
+
   HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
   HAL_UART_Receive_IT(&huart3, UART_3_buffor, 1);
+
   vTaskStartScheduler();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -362,7 +368,7 @@ void printmsg(char *msg){
 
 }
 
-void UART_2_handler(void * pvParameters)
+void MSG_check_handler(void * pvParameters)
 {
 	uint8_t buffor_size = 0;
 	while(1)
@@ -395,29 +401,22 @@ void UART_3_handler(void * pvParameters)
 
 	while(1)
 	{
-		xTaskNotifyWait(0, 0, (uint32_t*)&rec_addr, portMAX_DELAY);
-		position_addr = (GPS_Position_Data_t *)rec_addr;
-		sprintf(msg,"Position: %d\n",position_addr->Latitude_deg);
-		printmsg(msg);
-		 HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
+		if(xTaskNotifyWait(0, 0, (uint32_t*)&rec_addr, portMAX_DELAY) == pdPASS)
+		{
+			position_addr = (GPS_Position_Data_t *)rec_addr;
 
+			sprintf(msg,"Position: %d.%ld %d.%ld", position_addr->Latitude_deg, position_addr->Latitude_minINdegrees, \
+					position_addr->Longtitude_deg, position_addr->Longtitude_minINdegrees);
+			printmsg(msg);
 
-
-		  //sprintf(send_text, "Task UART3 is working\n");
-		  //printmsg(send_text);
-
-//		  if(position.Latitude_deg != 0)
-//		  {
-//
-//	#if defined(DEBUG_PRINT)
-//			printf("Position: %d.%ld", position.Latitude_deg, position.Latitude_minINdegrees);
-//			printf(" %d.%ld", position.Longtitude_deg, position.Longtitude_minINdegrees);
-//			printf(" TIME: %02d:%02d:%02d\n", (position.Time.hours + TIMEZONE), position.Time.minutes, position.Time.seconds);
-//	#endif
-//			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
-//			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_11);
-//			position.Latitude_deg = 0;
-//		  }
+			#if defined(TIME_ZONE)
+				sprintf(msg," TIME: %02d:%02d:%02d\n", (position_addr->Time.hours + TIME_ZONE), position_addr->Time.minutes, position_addr->Time.seconds);
+			#else
+				sprintf(msg," TIME UTC: %02d:%02d:%02d\n", (position_addr->Time.hours), position_addr->Time.minutes, position_addr->Time.seconds);
+			#endif
+				printmsg(msg);
+			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
+		}
 	}
 }
 
@@ -427,16 +426,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	if(huart == &huart3)
 	{
-		//xTaskNotify(UART3_task, 0, eNoAction);
+
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
 
+#if defined(UART23_bridge)
 		if(xSemaphoreTakeFromISR(xUART_2, 0) == pdPASS)
 		{
 			//SEND FROM UART2 => UART3
 			HAL_UART_Transmit(&huart2, UART_3_buffor, 1, 0); // 0 delay - very important!!
 			xSemaphoreGiveFromISR(xUART_2, 0);
 		}
-
+#endif
 		HAL_UART_Receive_IT(&huart3, UART_3_buffor, 1);
 
 	}
@@ -444,18 +444,21 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	{
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
 
+#if defined(UART23_bridge)
 		if(xSemaphoreTakeFromISR(xUART_3, 0) == pdPASS){
 			//SEND FROM UART2 => UART3
 			HAL_UART_Transmit(&huart3, UART_2_buffor, 1, 0); // 0 delay - very important!!
 			xSemaphoreGiveFromISR(xUART_3, 0);
 		}
-		//IF FUNCTION WILL BE RECEIVED
+#endif
+		//if message will be analyzed
 		if(rec_status)
 		{
 			rec_buff[rec_status-1] = UART_2_buffor[0];
 			if(rec_buff[rec_status-1] == '\n')
 			{
-				xTaskNotifyFromISR(UART2_task, (rec_status-1), eSetValueWithOverwrite, 0);
+				//notify the MSG checking task
+				xTaskNotifyFromISR(MSG_check_task, (rec_status-1), eSetValueWithOverwrite, 0);
 				rec_status = 0;
 			}else{
 				rec_status++;
