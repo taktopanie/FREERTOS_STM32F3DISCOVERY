@@ -424,23 +424,31 @@ void UART_3_handler(void * pvParameters)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	static uint8_t rec_status = 0;
+
 	if(huart == &huart3)
 	{
 		//xTaskNotify(UART3_task, 0, eNoAction);
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
-		//HAL_UART_Transmit(&huart2, UART_3_buffor, 1, 0); // 0 delay - very important!!
+
+		if(xSemaphoreTakeFromISR(xUART_2, 0) == pdPASS)
+		{
+			//SEND FROM UART2 => UART3
+			HAL_UART_Transmit(&huart2, UART_3_buffor, 1, 0); // 0 delay - very important!!
+			xSemaphoreGiveFromISR(xUART_2, 0);
+		}
 
 		HAL_UART_Receive_IT(&huart3, UART_3_buffor, 1);
 
 	}
 	if(huart == &huart2)
 	{
-
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
 
-		//SEND FROM UART2 => UART3
-		HAL_UART_Transmit(&huart3, UART_2_buffor, 1, 0); // 0 delay - very important!!
-
+		if(xSemaphoreTakeFromISR(xUART_3, 0) == pdPASS){
+			//SEND FROM UART2 => UART3
+			HAL_UART_Transmit(&huart3, UART_2_buffor, 1, 0); // 0 delay - very important!!
+			xSemaphoreGiveFromISR(xUART_3, 0);
+		}
 		//IF FUNCTION WILL BE RECEIVED
 		if(rec_status)
 		{
@@ -454,7 +462,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			}
 
 		}
-		//Start of the phrase, start recordint
+		//Start of the phrase, start recording
 		if(UART_2_buffor[0] == '$'){
 			rec_status = 1;
 		}
@@ -464,7 +472,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 
 	}
-	///////////////////////////////////////////////////////////////////////////
+
 }
 
 /* USER CODE END 4 */
