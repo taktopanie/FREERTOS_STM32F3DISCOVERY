@@ -50,6 +50,7 @@ TaskHandle_t LCD_handle = NULL;
 xQueueHandle xWorkQueue;
 
 xSemaphoreHandle xWork;
+xSemaphoreHandle xUART_3;
 
 char usr_msg[250];
 
@@ -118,7 +119,7 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   xWork = xSemaphoreCreateBinary();
-  //vSemaphoreCreateBinary(xWork);
+  xUART_3 = xSemaphoreCreateMutex();
 
   xWorkQueue = xQueueCreate(10, sizeof(char));
   BaseType_t Status;
@@ -351,14 +352,15 @@ static void sema_task (void *pvParameters){
 
 void printmsg(char *msg){
 
+		xSemaphoreTake(xUART_3, portMAX_DELAY);
 
-//		if(UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TXE, SET, 0, 100) == HAL_OK){
 		while ( __HAL_UART_GET_FLAG(&huart3, UART_FLAG_TXE) != SET);
-//		while(__HAL_GET_FLAG(UART_FLAG_TXE));
+
 		HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
 		while ( __HAL_UART_GET_FLAG(&huart3, UART_FLAG_TC) != SET);
 
+		xSemaphoreGive(xUART_3);
 
 
 }
