@@ -37,6 +37,15 @@
 /* USER CODE BEGIN PD */
 
 /*
+ * UART2 is used for GPS module
+ * 	PA2 - TX
+ * 	PA3 - RX
+ * UART3 is used for user
+ *  PB10 - TX
+ *  PB11 - RX
+ *
+ */
+/*
  * DEFINE IF YOU WANT TO BRIDGE THESE TWO UARTS -- MOSTLY USED DURING CONFIGURATION GPS RECEIVER
  */
 //#define UART23_bridge
@@ -44,6 +53,11 @@
  * DEFINE YOUR TIMEZONE HERE, IF NOT IT WILL PRINT UTC TIME
  */
 #define TIME_ZONE 1
+#define USE_SEGGER
+
+#ifdef USE_SEGGER
+	#define DWT_CTRL		(*(volatile uint32_t *) 0xE0001000)
+#endif
 
 /* USER CODE END PD */
 
@@ -109,6 +123,15 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
+#if defined(USE_SEGGER)
+		  DWT_CTRL |= (1 << 0);
+
+
+		  SEGGER_SYSVIEW_Conf();
+
+		  SEGGER_SYSVIEW_Start();
+#endif
 
   Status = xTaskCreate(MSG_check_handler , "MSG_check_task" , 200, "MSG checking", 1, &MSG_check_task);
   configASSERT(Status == pdPASS);
