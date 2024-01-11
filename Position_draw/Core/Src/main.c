@@ -161,6 +161,11 @@ int main(void)
   HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
   HAL_UART_Receive_IT(&huart3, USER_print_buffor, 1);
 
+
+  myprintf("Program has been started...\n"
+		  "The logs will be automatically collected\n\n"
+		  "Press the USER button to unmount the SD CARD!!!\n\n");
+
   vTaskStartScheduler();
   /* USER CODE END 2 */
 
@@ -357,10 +362,8 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
-                           MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT1_Pin
-                          |MEMS_INT2_Pin;
+  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -376,11 +379,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MISOA7_Pin */
   GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MISOA7_Pin;
@@ -413,6 +416,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -424,6 +431,8 @@ void SD_card_handler (void *pvParameters)
 
 	GPS_Position_Data_t * position_addr = 0;
 	uint32_t rec_addr = 0;
+	//Read bufer
+	BYTE writebuff[30];
 
 	  myprintf("\r\n~ SD card demo ~\r\n\r\n");
 
@@ -438,75 +447,74 @@ void SD_card_handler (void *pvParameters)
 	  //Open the file system
 	  fres = f_mount(&FatFs, "", 1); //1=mount now
 
-	  //TODO: IF THERE IS NO SD CARD PROGRAM STUCK
 	  if (fres != FR_OK) {
 		myprintf("f_mount error (%i)\r\n", fres);
-		while(1);
-	  }
-
-	  //Read bufer
-	  BYTE writebuff[30];
-
-	  //Now let's try and write a file "write.txt"
-	  fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
-
-	  if(fres == FR_OK) {
-		myprintf("Logfile was created\r\n");
-	  } else {
-		myprintf("f_open error (%i)\r\n", fres);
-	  }
-
-	  //close file
-	  f_close(&fil);
-
-	  for(int i = 0; i < 20; i++)
+	  }else
 	  {
-		  fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS );
+		 	  //Try to create "LOG.txt" file
+		 	  fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
 
-		  if(fres == FR_OK) {
-			//APPEND
-			f_lseek(&fil, fil.fsize);
+		 	  if(fres == FR_OK) {
+		 		myprintf("Logfile was created\r\n");
+		 	  } else {
+		 		myprintf("f_open error (%i)\r\n", fres);
+		 	  }
 
-		  } else {
-			myprintf("f_open error (%i)\r\n", fres);
-		  }
+		 	  //close file
+		 	  f_close(&fil);
 
-		  sprintf((char*)writebuff, "Position: %d\n", i);
-
-		  //Copy in a string
-		  //memcpy((char*)writebuff, "a new file is made!\n", 20);
-
-		  uint8_t length = strlen((char*)writebuff);
-
-		  UINT bytesWrote;
-		  fres = f_write(&fil, writebuff, length, &bytesWrote);
-		  if(fres == FR_OK) {
-			myprintf("Logfile updated\r\n", bytesWrote);
-		  } else {
-			myprintf("f_write error (%i)\r\n");
-		  }
-
-		  //Be a tidy kiwi - don't forget to close your file!
-		  f_close(&fil);
 	  }
-	  //Unmount just for testing
-	  f_mount(NULL, "", 0);
 
 	  portEXIT_CRITICAL();
 
 	while(1)
 	{
-		if(xTaskNotifyWait(0, 0, &rec_addr, portMAX_DELAY) == pdPASS)
+		myprintf("HELLO\n");
+
+		if(xTaskNotifyWait(0, 0, &rec_addr, pdMS_TO_TICKS(1000)) == pdPASS)
 		{
 			position_addr = (GPS_Position_Data_t *)rec_addr;
 			if(xSemaphoreTake(xUART_3,0) == pdPASS)
 			{
+
+				portENTER_CRITICAL();
 				//SEND FROM UART2 => UART3
 				myprintf("Data written to SDCARD\n\rLatitude: %d.%ld, Longtitude: %d.%ld,\n\rTime: %d:%d:%d\n\r", position_addr->Latitude_deg, \
 						position_addr->Latitude_minINdegrees, position_addr->Longtitude_deg, \
 						position_addr->Longtitude_minINdegrees, position_addr->Time.hours, \
 						position_addr->Time.minutes, position_addr->Time.seconds);
 				xSemaphoreGive(xUART_3);
+
+				if (fres == FR_OK)
+				{
+					 fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS );
+
+					 if(fres == FR_OK) {
+						//APPEND
+						f_lseek(&fil, fil.fsize);
+
+					 } else {
+						myprintf("f_open error (%i)\r\n", fres);
+					 }
+
+					 sprintf((char*)writebuff, "%d.%ld, %d.%ld, Time: %d:%d:%d\n\r", position_addr->Latitude_deg, \
+						position_addr->Latitude_minINdegrees, position_addr->Longtitude_deg, \
+						position_addr->Longtitude_minINdegrees, position_addr->Time.hours, \
+						position_addr->Time.minutes, position_addr->Time.seconds);
+
+					 uint8_t length = strlen((char*)writebuff);
+
+					 UINT bytesWrote;
+					 fres = f_write(&fil, writebuff, length, &bytesWrote);
+					 if(fres == FR_OK) {
+						myprintf("Logfile updated\r\n", bytesWrote);
+					 } else {
+						myprintf("f_write error (%i)\r\n");
+					 }
+
+					 f_close(&fil);
+				}
+				 portEXIT_CRITICAL();
 
 				//DATA MAY BE FREED
 				xTaskNotify(GPS_MSG_check_task,0,eNoAction);
@@ -638,6 +646,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 
 	}
+
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	f_mount(NULL, "", 0);
+	myprintf("Logging has been stopped, SDCARD can be removed now...\n");
+	//SUSPEND THE SD CARD TASK and unmount the SD card
+	vTaskSuspend(SD_card_task);
 
 }
 
