@@ -39,7 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//#define USE_SEGGER
+#define USE_SEGGER
 
 //#define UART23_bridge
 
@@ -74,6 +74,8 @@ volatile GPS_Position_Data_t position;
 xSemaphoreHandle xUART_3;
 xSemaphoreHandle xUART_2;
 
+xSemaphoreHandle xSD_data;
+
 char send_text [200];
 
 
@@ -95,7 +97,7 @@ void USER_print_handler(void * pvParameters);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void myprintf(const char *fmt, ...) {
-  static char buffer[256];
+  static char buffer[500];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -103,6 +105,10 @@ void myprintf(const char *fmt, ...) {
 
   int len = strlen(buffer);
   HAL_UART_Transmit(&huart3, (uint8_t*)buffer, len, -1);
+
+  //while UART3 TC not set (transfer not completed)
+  uint32_t* wsk = (uint32_t*)0x4000481cUL;
+  while(!(*wsk & (1<<6)));
 
 }
 /* USER CODE END 0 */
@@ -121,19 +127,19 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
   /* USER CODE BEGIN Init */
-  Status = xTaskCreate(SD_card_handler , "SD_CARD_task" , 600, "SD_card_proc", 1, &SD_card_task);
+  Status = xTaskCreate(SD_card_handler , "SD_CARD_task" , 600, "SD_card_proc", 3, &SD_card_task);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(GPS_MSG_check_handler , "GPS_MSG_check_task" , 200, "GPS MSG checking", 1, &GPS_MSG_check_task);
+  Status = xTaskCreate(GPS_MSG_check_handler , "GPS_MSG_check_task" , 500, "GPS MSG checking", 1, &GPS_MSG_check_task);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(USER_print_handler , "USER print task" , 200, "USER printing", 1, &USER_print_task);
+  Status = xTaskCreate(USER_print_handler , "USER print task" , 500, "USER printing", 2, &USER_print_task);
   configASSERT(Status == pdPASS);
 
   xUART_3 = xSemaphoreCreateMutex();
   xUART_2 = xSemaphoreCreateMutex();
+  xSD_data = xSemaphoreCreateBinary();
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -155,16 +161,21 @@ int main(void)
   MX_SPI2_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
+  myprintf(	"\r\n########################################################\n"
+			"#                                                      #\n"
+			"# Program has been started...                          #\n"
+		  	"# The logs will be automatically collected             #\n"
+		  	"#                                                      #\n"
+		  	"# Press the USER button to unmount the SD CARD!!!      #\n"
+		  	"#                                                      #\n"
+		  	"########################################################\n");
+
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
   HAL_UART_Receive_IT(&huart3, USER_print_buffor, 1);
 
-
-  myprintf("Program has been started...\n"
-		  "The logs will be automatically collected\n\n"
-		  "Press the USER button to unmount the SD CARD!!!\n\n");
 
   vTaskStartScheduler();
   /* USER CODE END 2 */
@@ -431,94 +442,101 @@ void SD_card_handler (void *pvParameters)
 
 	GPS_Position_Data_t * position_addr = 0;
 	uint32_t rec_addr = 0;
-	//Read bufer
-	BYTE writebuff[30];
+	BYTE writebuff[50];
 
-	  myprintf("\r\n~ SD card demo ~\r\n\r\n");
+	uint8_t SD_mount_status = 0;
 
-	  vTaskDelay(pdMS_TO_TICKS(1000)); //a short delay is important to let the SD card settle
+	xSemaphoreTake(xUART_3,0);
+	myprintf("\rSD card INITIALIZE \r");
+	vTaskDelay(pdMS_TO_TICKS(1000)); //a short delay is important to let the SD card settle
+	xSemaphoreGive(xUART_3);
 
-	  //some variables for FatFs
-	  FATFS FatFs; 	//Fatfs handle
-	  FIL fil; 		//File handle
-	  FRESULT fres; //Result after operations
+	//some variables for FatFs
+	FATFS FatFs; 	//Fatfs handle
+	FIL fil; 		//File handle
+	FRESULT fres; //Result after operations
 
-	  portENTER_CRITICAL();
-	  //Open the file system
-	  fres = f_mount(&FatFs, "", 1); //1=mount now
+	portENTER_CRITICAL();
+	//Open the file system
+	SD_mount_status = f_mount(&FatFs, "", 1); //1=mount now
 
-	  if (fres != FR_OK) {
-		myprintf("f_mount error (%i)\r\n", fres);
-	  }else
-	  {
-		 	  //Try to create "LOG.txt" file
-		 	  fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
+	if (SD_mount_status != FR_OK) {
+		myprintf("f_mount error (%i)\r\n", SD_mount_status);
+	}else
+	{
+		//Try to create "LOG.txt" file
+		fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
 
-		 	  if(fres == FR_OK) {
-		 		myprintf("Logfile was created\r\n");
-		 	  } else {
-		 		myprintf("f_open error (%i)\r\n", fres);
-		 	  }
+		if(fres == FR_OK) {
+			myprintf("Logfile was created\r\n");
+		} else {
+			myprintf("f_open error (%i)\r\n", fres);
+		}
+		//close file
+		f_close(&fil);
 
-		 	  //close file
-		 	  f_close(&fil);
-
-	  }
-
-	  portEXIT_CRITICAL();
+	}
+	portEXIT_CRITICAL();
 
 	while(1)
 	{
-		myprintf("HELLO\n");
-
-		if(xTaskNotifyWait(0, 0, &rec_addr, pdMS_TO_TICKS(1000)) == pdPASS)
+		if(xTaskNotifyWait(0, 0, &rec_addr, portMAX_DELAY) == pdPASS)
 		{
 			position_addr = (GPS_Position_Data_t *)rec_addr;
-			if(xSemaphoreTake(xUART_3,0) == pdPASS)
+
+
+			if(SD_mount_status == FR_OK)
 			{
-
 				portENTER_CRITICAL();
-				//SEND FROM UART2 => UART3
-				myprintf("Data written to SDCARD\n\rLatitude: %d.%ld, Longtitude: %d.%ld,\n\rTime: %d:%d:%d\n\r", position_addr->Latitude_deg, \
-						position_addr->Latitude_minINdegrees, position_addr->Longtitude_deg, \
-						position_addr->Longtitude_minINdegrees, position_addr->Time.hours, \
-						position_addr->Time.minutes, position_addr->Time.seconds);
-				xSemaphoreGive(xUART_3);
-
+				fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS );
 				if (fres == FR_OK)
 				{
-					 fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS );
+					//APPEND
+					f_lseek(&fil, fil.fsize);
 
-					 if(fres == FR_OK) {
-						//APPEND
-						f_lseek(&fil, fil.fsize);
-
-					 } else {
-						myprintf("f_open error (%i)\r\n", fres);
-					 }
-
-					 sprintf((char*)writebuff, "%d.%ld, %d.%ld, Time: %d:%d:%d\n\r", position_addr->Latitude_deg, \
+					sprintf((char*)writebuff, "%d.%ld, %d.%ld, Time: %02d:%02d:%02d\n", position_addr->Latitude_deg, \
 						position_addr->Latitude_minINdegrees, position_addr->Longtitude_deg, \
 						position_addr->Longtitude_minINdegrees, position_addr->Time.hours, \
 						position_addr->Time.minutes, position_addr->Time.seconds);
 
 					 uint8_t length = strlen((char*)writebuff);
-
 					 UINT bytesWrote;
+
 					 fres = f_write(&fil, writebuff, length, &bytesWrote);
 					 if(fres == FR_OK) {
-						myprintf("Logfile updated\r\n", bytesWrote);
+						 if(xSemaphoreTake(xUART_3,0) == pdPASS)
+						 {
+							myprintf("Logfile updated\r\n");
+							xSemaphoreGive(xUART_3);
+						 }
+
 					 } else {
-						myprintf("f_write error (%i)\r\n");
+						 if(xSemaphoreTake(xUART_3,0) == pdPASS)
+						 {
+								myprintf("f_write error (%i)\r\n");
+								xSemaphoreGive(xUART_3);
+						 }
+
 					 }
 
 					 f_close(&fil);
+				} else {
+					 if(xSemaphoreTake(xUART_3,0) == pdPASS)
+					 {
+						 myprintf("f_open error (%i)\r\n", fres);
+						xSemaphoreGive(xUART_3);
+					 }
+				 }
+				//flush the buffor
+				for(int i = 0; i < 30; i++)
+				{
+					writebuff[i] = '\0';
 				}
 				 portEXIT_CRITICAL();
-
-				//DATA MAY BE FREED
-				xTaskNotify(GPS_MSG_check_task,0,eNoAction);
 			}
+			//DATA MAY BE FREED
+			xSemaphoreGive(xSD_data);
+
 		}
 	}
 }
@@ -526,40 +544,48 @@ void SD_card_handler (void *pvParameters)
 void GPS_MSG_check_handler (void *pvParameters)
 {
 	uint8_t buffor_size = 0;
-		while(1)
+	while(1)
+	{
+		//wait for notify from UART receiver
+		xTaskNotifyWait(0, 0, (uint32_t *)&buffor_size, portMAX_DELAY);
+
+		//checks if pending message is position info
+		position = GPS_get_position(rec_buff, buffor_size);
+		if(position.Latitude_deg != 0)
 		{
-			//wait for notify from UART receiver
-			xTaskNotifyWait(0, 0, (uint32_t *)&buffor_size, portMAX_DELAY);
+			xTaskNotify(USER_print_task, (uint32_t)&position, eSetValueWithOverwrite);
 
-			//checks if pending message is position info
-			position = GPS_get_position(rec_buff, buffor_size);
-			if(position.Latitude_deg != 0)
-			{
-				xTaskNotify(USER_print_task, (uint32_t)&position, eSetValueWithOverwrite);
-
-				//wait untill data will be utilized
-				xTaskNotifyWait(0,0,0,portMAX_DELAY);
-			}
-			//flush the buffor
-			for(int i = 0; i < 100; i++)
-			{
-				rec_buff[i] = '\0';
-			}
+			//wait until data will be freed
+			xSemaphoreTake(xSD_data, portMAX_DELAY);
 		}
+		//flush the buffer
+		for(int i = 0; i < 100; i++)
+		{
+			rec_buff[i] = '\0';
+		}
+	}
 }
 
 void USER_print_handler (void *pvParameters)
 {
 	GPS_Position_Data_t * position_addr = 0;
 	uint32_t rec_addr = 0;
-	  // turn ON working LED and send hello text
-	  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, ENABLE);
 
-	  char msg [300];
+	// turn ON working LED and send hello text
+	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, ENABLE);
+
+	char msg [300];
 
 	while(1)
 	{
-		if(xTaskNotifyWait(0, 0, (uint32_t*)&rec_addr, portMAX_DELAY) == pdPASS)
+		if(xSemaphoreTake(xUART_3,0)==pdPASS)
+		{
+			myprintf("Program is RUNNING\n");
+			xSemaphoreGive(xUART_3);
+		}
+
+
+		if(xTaskNotifyWait(0, 0, (uint32_t*)&rec_addr, pdMS_TO_TICKS(1000)) == pdPASS)
 		{
 			position_addr = (GPS_Position_Data_t *)rec_addr;
 
