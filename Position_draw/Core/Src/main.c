@@ -22,12 +22,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "FreeRTOS.h"
-#include "task.h"
-#include "semphr.h"
-#include "string.h"
-#include <stdio.h>
-
 #include "my_GPS.h"
 
 /* USER CODE END Includes */
@@ -64,7 +58,7 @@ TaskHandle_t SD_card_task;
 TaskHandle_t GPS_MSG_check_task;
 TaskHandle_t USER_print_task;
 
-uint8_t UART_2_buffor [10];
+uint8_t UART_2_buffor [20];
 uint8_t USER_print_buffor [10];
 
 uint8_t rec_buff[500];
@@ -77,7 +71,7 @@ xSemaphoreHandle xUART_2;
 xSemaphoreHandle xSD_data;
 
 char send_text [200];
-
+void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName );
 
 /* USER CODE END PV */
 
@@ -128,18 +122,23 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
   /* USER CODE BEGIN Init */
-  Status = xTaskCreate(SD_card_handler , "SD_CARD_task" , 600, "SD_card_proc", 3, &SD_card_task);
+  Status = xTaskCreate(SD_card_handler , "SD_CARD_task" , 600, "SD_card_proc", 1, &SD_card_task);
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(GPS_MSG_check_handler , "GPS_MSG_check_task" , 500, "GPS MSG checking", 1, &GPS_MSG_check_task);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(USER_print_handler , "USER print task" , 500, "USER printing", 2, &USER_print_task);
+  Status = xTaskCreate(USER_print_handler , "USER print task" , 500, "USER printing", 1, &USER_print_task);
   configASSERT(Status == pdPASS);
 
   xUART_3 = xSemaphoreCreateMutex();
+  configASSERT(xUART_3 != NULL);
+
   xUART_2 = xSemaphoreCreateMutex();
+  configASSERT(xUART_2 != NULL);
+
   xSD_data = xSemaphoreCreateBinary();
+  configASSERT(xSD_data != NULL);
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -549,6 +548,8 @@ void GPS_MSG_check_handler (void *pvParameters)
 		//wait for notify from UART receiver
 		xTaskNotifyWait(0, 0, (uint32_t *)&buffor_size, portMAX_DELAY);
 
+		portDISABLE_INTERRUPTS();
+
 		//checks if pending message is position info
 		position = GPS_get_position(rec_buff, buffor_size);
 		if(position.Latitude_deg != 0)
@@ -559,10 +560,11 @@ void GPS_MSG_check_handler (void *pvParameters)
 			xSemaphoreTake(xSD_data, portMAX_DELAY);
 		}
 		//flush the buffer
-		for(int i = 0; i < 100; i++)
+		for(int i = 0; i < buffor_size; i++)
 		{
 			rec_buff[i] = '\0';
 		}
+		portENABLE_INTERRUPTS();
 	}
 }
 
@@ -580,7 +582,7 @@ void USER_print_handler (void *pvParameters)
 	{
 		if(xSemaphoreTake(xUART_3,0)==pdPASS)
 		{
-			myprintf("Program is RUNNING\n");
+			myprintf("RUNNING\n");
 			xSemaphoreGive(xUART_3);
 		}
 
@@ -652,6 +654,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		if(rec_status)
 		{
 			rec_buff[rec_status-1] = UART_2_buffor[0];
+			UART_2_buffor[0] = '\0';
 			if(rec_buff[rec_status-1] == '\n')
 			{
 				//notify the MSG checking task
@@ -661,12 +664,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				rec_status++;
 			}
 
-		}
-		//Start of the phrase, start recording
-		if(UART_2_buffor[0] == '$'){
+		}else
+		{
+			//Start of the phrase, start recording
+			if(UART_2_buffor[0] == '$'){
 			rec_status = 1;
+			}
 		}
-
 		HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
 
 
@@ -682,6 +686,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	//SUSPEND THE SD CARD TASK and unmount the SD card
 	vTaskSuspend(SD_card_task);
 
+}
+
+void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName )
+{
+	myprintf("Stack overflowed by: %s \r\n", pcTaskName);
 }
 
 /* USER CODE END 4 */

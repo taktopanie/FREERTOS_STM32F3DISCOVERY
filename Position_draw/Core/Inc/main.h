@@ -31,7 +31,16 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define SD_SPI_HANDLE hspi2
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+#include "string.h"
+#include <stdio.h>
+
+
+
+
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -115,7 +124,7 @@ void Error_Handler(void);
 #define MEMS_INT2_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
-
+#define SD_SPI_HANDLE hspi2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
