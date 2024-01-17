@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define USE_SEGGER
+//#define USE_SEGGER
 
 //#define UART23_bridge
 
@@ -121,8 +121,9 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
+
   /* USER CODE BEGIN Init */
-  Status = xTaskCreate(SD_card_handler , "SD_CARD_task" , 600, "SD_card_proc", 1, &SD_card_task);
+  Status = xTaskCreate(SD_card_handler , "SD_CARD_task" , 600, "SD_card_proc", 4, &SD_card_task);
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(GPS_MSG_check_handler , "GPS_MSG_check_task" , 500, "GPS MSG checking", 1, &GPS_MSG_check_task);
@@ -148,7 +149,6 @@ int main(void)
 #if defined(USE_SEGGER)
 		  DWT_CTRL |= (1 << 0);
 
-
 		  SEGGER_SYSVIEW_Conf();
 
 		  SEGGER_SYSVIEW_Start();
@@ -160,21 +160,22 @@ int main(void)
   MX_SPI2_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
-  myprintf(	"\r\n########################################################\n"
-			"#                                                      #\n"
-			"# Program has been started...                          #\n"
-		  	"# The logs will be automatically collected             #\n"
-		  	"#                                                      #\n"
-		  	"# Press the USER button to unmount the SD CARD!!!      #\n"
-		  	"#                                                      #\n"
-		  	"########################################################\n");
-
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
   HAL_UART_Receive_IT(&huart3, USER_print_buffor, 1);
 
+  // turn ON working LED and send hello text
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, ENABLE);
+  myprintf("\r\n########################################################\n"
+		  	  "#                                                      #\n"
+		  	  "# Program has been started...                          #\n"
+		  	  "# The logs will be automatically collected             #\n"
+		  	  "#                                                      #\n"
+		  	  "# Press the USER button to unmount the SD CARD!!!      #\n"
+		  	  "#                                                      #\n"
+		  	  "########################################################\n");
 
   vTaskStartScheduler();
   /* USER CODE END 2 */
@@ -441,7 +442,7 @@ void SD_card_handler (void *pvParameters)
 
 	GPS_Position_Data_t * position_addr = 0;
 	uint32_t rec_addr = 0;
-	BYTE writebuff[50];
+	BYTE writebuff[100];		//TODO: BUFFER SIZE WILL BE ANALYZED IN THE FUTURE
 
 	uint8_t SD_mount_status = 0;
 
@@ -464,10 +465,14 @@ void SD_card_handler (void *pvParameters)
 	}else
 	{
 		//Try to create "LOG.txt" file
-		fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
+		fres = f_open(&fil, "position.log", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
 
 		if(fres == FR_OK) {
 			myprintf("Logfile was created\r\n");
+
+			//SD MOUNT LED INDICATORS (GREEN LEDS)
+			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, ENABLE);
+			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, ENABLE);
 		} else {
 			myprintf("f_open error (%i)\r\n", fres);
 		}
@@ -486,14 +491,15 @@ void SD_card_handler (void *pvParameters)
 
 			if(SD_mount_status == FR_OK)
 			{
-				portENTER_CRITICAL();
-				fres = f_open(&fil, "LOG.txt", FA_WRITE | FA_OPEN_ALWAYS );
+				//portENTER_CRITICAL();			<<<<<<<<<<<< THIS CRITICAL SECTION CAUSING THE CRASH
+
+				fres = f_open(&fil, "position.log", FA_WRITE | FA_OPEN_ALWAYS );
 				if (fres == FR_OK)
 				{
 					//APPEND
 					f_lseek(&fil, fil.fsize);
 
-					sprintf((char*)writebuff, "%d.%ld, %d.%ld, Time: %02d:%02d:%02d\n", position_addr->Latitude_deg, \
+					sprintf((char*)writebuff, "%d.%ld,%d.%ld,%02d:%02d:%02d\n", position_addr->Latitude_deg, \
 						position_addr->Latitude_minINdegrees, position_addr->Longtitude_deg, \
 						position_addr->Longtitude_minINdegrees, position_addr->Time.hours, \
 						position_addr->Time.minutes, position_addr->Time.seconds);
@@ -531,7 +537,9 @@ void SD_card_handler (void *pvParameters)
 				{
 					writebuff[i] = '\0';
 				}
-				 portEXIT_CRITICAL();
+
+				// portEXIT_CRITICAL();			<<<<<<<<<<<< THIS CRITICAL SECTION CAUSING THE CRASH
+
 			}
 			//DATA MAY BE FREED
 			xSemaphoreGive(xSD_data);
@@ -572,9 +580,6 @@ void USER_print_handler (void *pvParameters)
 {
 	GPS_Position_Data_t * position_addr = 0;
 	uint32_t rec_addr = 0;
-
-	// turn ON working LED and send hello text
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, ENABLE);
 
 	char msg [300];
 
@@ -621,6 +626,11 @@ void USER_print_handler (void *pvParameters)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+
+#if defined(USE_SEGGER)
+	SEGGER_SYSVIEW_RecordEnterISR();
+#endif
+
 	static uint8_t rec_status = 0;
 
 	if(huart == &huart3)
@@ -677,11 +687,23 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	}
 
+#if defined(USE_SEGGER)
+	SEGGER_SYSVIEW_RecordExitISR();
+#endif
+
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	f_mount(NULL, "", 0);
+
+	//TURN OFF SD CARD LEDS
+	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, DISABLE);
+	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, DISABLE);
+
+	//TURN OFF STATUS LED
+	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
+
 	myprintf("Logging has been stopped, SDCARD can be removed now...\n");
 	//SUSPEND THE SD CARD TASK and unmount the SD card
 	vTaskSuspend(SD_card_task);
