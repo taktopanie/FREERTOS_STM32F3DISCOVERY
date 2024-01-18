@@ -36,10 +36,7 @@ extern "C" {
 #include "semphr.h"
 #include "string.h"
 #include <stdio.h>
-
-
-
-
+#include "my_GPS.h"
 
 /* USER CODE END Includes */
 

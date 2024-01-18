@@ -22,7 +22,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "my_GPS.h"
 
 /* USER CODE END Includes */
 
@@ -49,7 +48,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
-
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
@@ -58,8 +56,11 @@ TaskHandle_t SD_card_task;
 TaskHandle_t GPS_MSG_check_task;
 TaskHandle_t USER_print_task;
 
-uint8_t UART_2_buffor [20];
-uint8_t USER_print_buffor [10];
+//Buffer used to gather GPS data
+uint8_t UART_2_buffer [20];
+
+//Buffer used to print USER data on UART3
+uint8_t USER_print_buffer [10];
 
 uint8_t rec_buff[500];
 
@@ -163,8 +164,8 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
-  HAL_UART_Receive_IT(&huart3, USER_print_buffor, 1);
+  HAL_UART_Receive_IT(&huart2, UART_2_buffer, 1);
+  HAL_UART_Receive_IT(&huart3, USER_print_buffer, 1);
 
   // turn ON working LED and send hello text
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, ENABLE);
@@ -439,22 +440,36 @@ static void MX_GPIO_Init(void)
 
 void SD_card_handler (void *pvParameters)
 {
+	/*
+	 * Private variables
+	 */
 
+	//received position calculated
 	GPS_Position_Data_t * position_addr = 0;
+
+	//address received throught notification
 	uint32_t rec_addr = 0;
+
+	//buffer to write the data to SD CARD
 	BYTE writebuff[100];		//TODO: BUFFER SIZE WILL BE ANALYZED IN THE FUTURE
 
+	//SDcard mounting status
 	uint8_t SD_mount_status = 0;
+
+	//variables for FatFs
+	FATFS FatFs; 				//Fatfs handle
+	FIL fil; 					//File handle
+	FRESULT fres; 				//Result after operations
+
+
+	/*
+	 * Code
+	 */
 
 	xSemaphoreTake(xUART_3,0);
 	myprintf("\rSD card INITIALIZE \r");
 	vTaskDelay(pdMS_TO_TICKS(1000)); //a short delay is important to let the SD card settle
 	xSemaphoreGive(xUART_3);
-
-	//some variables for FatFs
-	FATFS FatFs; 	//Fatfs handle
-	FIL fil; 		//File handle
-	FRESULT fres; //Result after operations
 
 	portENTER_CRITICAL();
 	//Open the file system
@@ -521,9 +536,7 @@ void SD_card_handler (void *pvParameters)
 								myprintf("f_write error (%i)\r\n");
 								xSemaphoreGive(xUART_3);
 						 }
-
 					 }
-
 					 f_close(&fil);
 				} else {
 					 if(xSemaphoreTake(xUART_3,0) == pdPASS)
@@ -539,23 +552,31 @@ void SD_card_handler (void *pvParameters)
 				}
 
 				// portEXIT_CRITICAL();			<<<<<<<<<<<< THIS CRITICAL SECTION CAUSING THE CRASH
-
 			}
 			//DATA MAY BE FREED
 			xSemaphoreGive(xSD_data);
-
 		}
 	}
 }
 
 void GPS_MSG_check_handler (void *pvParameters)
 {
+	/*
+	 * Private variables
+	 */
+
 	uint8_t buffor_size = 0;
+
+	/*
+	 * Code
+	 */
+
 	while(1)
 	{
 		//wait for notify from UART receiver
 		xTaskNotifyWait(0, 0, (uint32_t *)&buffor_size, portMAX_DELAY);
 
+		//TODO: this is not working, IRQ's are working
 		portDISABLE_INTERRUPTS();
 
 		//checks if pending message is position info
@@ -587,16 +608,16 @@ void USER_print_handler (void *pvParameters)
 	{
 		if(xSemaphoreTake(xUART_3,0)==pdPASS)
 		{
+			//notify the user that program is running
 			myprintf("RUNNING\n");
 			xSemaphoreGive(xUART_3);
 		}
-
 
 		if(xTaskNotifyWait(0, 0, (uint32_t*)&rec_addr, pdMS_TO_TICKS(1000)) == pdPASS)
 		{
 			position_addr = (GPS_Position_Data_t *)rec_addr;
 
-
+			//notify the user that data has been received
 			sprintf(msg,"Position: %d.%ld %d.%ld", position_addr->Latitude_deg, position_addr->Latitude_minINdegrees, \
 					position_addr->Longtitude_deg, position_addr->Longtitude_minINdegrees);
 			if(xSemaphoreTake(xUART_3,0)==pdPASS)
@@ -616,9 +637,8 @@ void USER_print_handler (void *pvParameters)
 					xSemaphoreGive(xUART_3);
 				}
 
-				//NOTIFY TASK TO SAVE THE DATA
-				xTaskNotify(SD_card_task,rec_addr,eSetValueWithOverwrite);
-
+			//notify SD_card task to save the data and toggle the LED
+			xTaskNotify(SD_card_task,rec_addr,eSetValueWithOverwrite);
 			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
 		}
 	}
@@ -642,11 +662,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		if(xSemaphoreTakeFromISR(xUART_2, 0) == pdPASS)
 		{
 			//SEND FROM UART2 => UART3
-			HAL_UART_Transmit(&huart2, USER_print_buffor, 1, 0); // 0 delay - very important!!
+			HAL_UART_Transmit(&huart2, USER_print_buffer, 1, 0); // 0 delay - very important!!
 			xSemaphoreGiveFromISR(xUART_2, 0);
 		}
 #endif
-		HAL_UART_Receive_IT(&huart3, USER_print_buffor, 1);
+		HAL_UART_Receive_IT(&huart3, USER_print_buffer, 1);
 
 	}
 	if(huart == &huart2)
@@ -656,15 +676,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 #if defined(UART23_bridge)
 		if(xSemaphoreTakeFromISR(xUART_3, 0) == pdPASS){
 			//SEND FROM UART2 => UART3
-			HAL_UART_Transmit(&huart3, UART_2_buffor, 1, 0); // 0 delay - very important!!
+			HAL_UART_Transmit(&huart3, UART_2_buffer, 1, 0); // 0 delay - very important!!
 			xSemaphoreGiveFromISR(xUART_3, 0);
 		}
 #endif
 		//if message will be analyzed
 		if(rec_status)
 		{
-			rec_buff[rec_status-1] = UART_2_buffor[0];
-			UART_2_buffor[0] = '\0';
+			rec_buff[rec_status-1] = UART_2_buffer[0];
+			UART_2_buffer[0] = '\0';
 			if(rec_buff[rec_status-1] == '\n')
 			{
 				//notify the MSG checking task
@@ -677,11 +697,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		}else
 		{
 			//Start of the phrase, start recording
-			if(UART_2_buffor[0] == '$'){
+			if(UART_2_buffer[0] == '$'){
 			rec_status = 1;
 			}
 		}
-		HAL_UART_Receive_IT(&huart2, UART_2_buffor, 1);
+		HAL_UART_Receive_IT(&huart2, UART_2_buffer, 1);
 
 
 
@@ -695,19 +715,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	f_mount(NULL, "", 0);
+	if(GPIO_Pin == GPIO_PIN_0)
+	{
+		//SUSPEND THE SD CARD TASK and unmount the SD card
+		f_mount(NULL, "", 0);
 
-	//TURN OFF SD CARD LEDS
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, DISABLE);
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, DISABLE);
+		//TURN OFF SD CARD LEDS
+		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, DISABLE);
+		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, DISABLE);
 
-	//TURN OFF STATUS LED
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
+		//TURN OFF STATUS LED
+		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
 
-	myprintf("Logging has been stopped, SDCARD can be removed now...\n");
-	//SUSPEND THE SD CARD TASK and unmount the SD card
-	vTaskSuspend(SD_card_task);
+		myprintf("Logging has been stopped, SDCARD can be removed now...\n");
 
+		vTaskSuspend(SD_card_task);
+	}
 }
 
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName )
