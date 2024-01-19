@@ -48,6 +48,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
+
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
