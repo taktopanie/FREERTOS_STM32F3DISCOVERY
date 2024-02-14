@@ -25,7 +25,7 @@
 #include "task.h"
 #include "timers.h"
 
-#include "ULN2003_motor.h"
+#include "MY_motor.h"
 
 /* USER CODE END Includes */
 
@@ -37,6 +37,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 TaskHandle_t motor_stepper;
+TaskHandle_t motor_servo;
 TimerHandle_t Timer_1;
 /* USER CODE END PD */
 
@@ -46,6 +47,7 @@ TimerHandle_t Timer_1;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 
@@ -54,8 +56,11 @@ TimerHandle_t Timer_1;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void vMotorControl (void* pvParameters);
+void vServoControl (void* pvParameters);
+
 void vTimer_1( TimerHandle_t xTimer );
 
 
@@ -97,9 +102,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   Status = xTaskCreate(vMotorControl, "STEPPER_MOTOR", 100, "ST_MT RUNNING", 1, &motor_stepper);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(vServoControl, "SERVO_MOTOR", 100, "SERVO RUNNING", 1, &motor_servo);
   configASSERT(Status == pdPASS);
 
   Timer_1 = xTimerCreate("Stepper TIM", portMAX_DELAY, pdTRUE, (void*) 0, vTimer_1);
@@ -159,6 +168,65 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 47;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 20119;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
 }
 
 /**
@@ -250,9 +318,10 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+//After setting motor via Timer this task only save the actual motor speed
 void vMotorControl (void* pvParameters)
 {
-	uint32_t del_time = 10;
 	uint32_t rec_time;
 
 	while(1)
@@ -260,8 +329,26 @@ void vMotorControl (void* pvParameters)
 		//save the motor speed
 		if(xTaskNotifyWait(0,0,&rec_time,portMAX_DELAY) == pdPASS)
 		{
-			del_time = rec_time;
+			//rec_time is the actual motor speed
 		}
+	}
+}
+
+void vServoControl (void* pvParameters)
+{
+	uint16_t _servo_position = 0;
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+	while(1)
+	{
+
+		SERVO_set(&htim2, _servo_position);
+		//SG90 is used <=> 180 is max value
+		_servo_position += 20;
+		if(_servo_position > 180)
+		{
+			_servo_position = 0;
+		}
+		vTaskDelay(pdMS_TO_TICKS(60000));
 	}
 }
 
@@ -303,7 +390,7 @@ void vButton_IRQ(void)
 		break;
 	case 6:
 		timer = 9999;
-		MOTOR_set_position(99);
+		MOTOR_set_position_ULN2003(99);
 		xTimerChangePeriodFromISR(Timer_1, portMAX_DELAY, 0);
 		mode = 0;
 	default:
@@ -316,7 +403,7 @@ void vButton_IRQ(void)
 
 void vTimer_1( TimerHandle_t xTimer )
 {
-	MOTOR_left();
+	MOTOR_left_ULN2003();
 }
 /* USER CODE END 4 */
 
