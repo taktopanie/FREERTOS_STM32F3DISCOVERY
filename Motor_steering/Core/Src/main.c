@@ -84,7 +84,7 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-
+uint8_t MOTOR_DIR;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,7 +95,6 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM4_Init(void);
-
 /* USER CODE BEGIN PFP */
 
 //TASK FUNCTIONS
@@ -282,7 +281,7 @@ static void MX_ADC1_Init(void)
   sConfig.Channel = ADC_CHANNEL_2;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_7CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -563,25 +562,88 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+uint16_t _meas = 0;
 void vMeasurements (void* pvParameters)
 {
-	uint16_t _meas = 0;
-	uint16_t _old_meas = 0;
+
+	uint16_t _old_meas_servo = 0;
+	uint16_t _old_meas_stepper = 0;
+
+	//measure threshold to deal with ADC fluctuations (servo and stepper has different sensitivity)
+	uint8_t _meas_threshold_servo = 10;
+	uint8_t _meas_threshold_stepper = 30;
+
+	uint32_t stepper_mask = 0;
+
 	//TIMER WHICH WILL BE USED TO TRIGGER THE ADC MEASUREMENTS
 	HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_4);
 
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&_meas, 1);
 
+
 	while(1)
 	{
 		//IF VALUE CHANGED
-		if(_old_meas != _meas)
+		if(_old_meas_servo >= (_meas + _meas_threshold_servo) || _old_meas_servo < (_meas - _meas_threshold_servo))
 		{
-			_old_meas = _meas;
 			xTaskNotify(motor_servo, _meas, eSetValueWithOverwrite);
-
+			_old_meas_servo = _meas;
 		}
+
+		if(_old_meas_stepper >= (_meas + _meas_threshold_stepper) || _old_meas_stepper < (_meas - _meas_threshold_stepper))
+		{
+			/*
+			 * STEPPER MOTOR SETTING UP
+			 *
+			 *
+			 * 3 speeds on the left/right + stop on the middle 4094 / 7 == 585 per mode
+			 *
+			 */
+
+			//LEFT TURN
+			if(_meas < 585){
+				//speed 1 left,
+				stepper_mask = (0<<0) | (1<<3);
+			}
+			else if (_meas >=585 && _meas <1170)
+			{
+				stepper_mask = (0<<0) | (1<<2);
+				//speed 2 left
+			}
+			else if (_meas >=1170 && _meas <1755)
+			{
+				stepper_mask = (0<<0) | (1<<1);
+				//speed 3 left
+			}
+
+			//IDLE MODE
+			else if (_meas >=1850 && _meas <2200)
+			{
+				//idle motor
+				stepper_mask = 0;
+			}
+
+			//RIGHT TURN
+			else if (_meas >=2340 && _meas <2925)
+			{
+				//speed 1 right
+				stepper_mask = (1<<0) | (1<<1);
+			}
+			else if (_meas >=2925 && _meas <3510)
+			{
+				//speed 2 right
+				stepper_mask = (1<<0) | (1<<2);
+			}
+			else if (_meas >=3510 && _meas <4095)
+			{
+				//speed 3 right
+				stepper_mask = (1<<0) | (1<<3);
+			}
+
+			xTaskNotify(motor_stepper, stepper_mask, eSetBits);
+			_old_meas_stepper = _meas;
+		}
+
 		vTaskDelay(pdMS_TO_TICKS(5));
 	}
 }
@@ -592,12 +654,60 @@ void vMotorControl (void* pvParameters)
 	//IF HARDWARE TIMER WILL BE USED
 	//HAL_TIM_Base_Start_IT(&htim3);
 	uint32_t rec_time;
+	uint8_t gear_old = 0;
 
 	while(1)
 	{
 		//save the motor speed
-		if(xTaskNotifyWait(0,0,&rec_time,portMAX_DELAY) == pdPASS)
+		if(xTaskNotifyWait(0xFF,0,&rec_time,portMAX_DELAY) == pdPASS)
 		{
+			//IDLE OR NOT
+			if(rec_time)
+			{
+				//DIRECTION
+				if(rec_time & (1<<0))
+				{
+					//RIGHT
+					MOTOR_DIR = 1;
+				}else
+				{
+					//LEFT
+					MOTOR_DIR = 0;
+				}
+
+				if(rec_time & (1<<1))
+				{
+					//GEAR 1
+					if(gear_old != 1){
+					xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(1000), 0);
+					gear_old = 1;
+					}
+				}
+				else if(rec_time & (1<<2))
+				{
+					//GEAR 2
+					if(gear_old != 2){
+					xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(300), 0);
+					gear_old = 2;
+					}
+				}
+				else if(rec_time & (1<<3))
+				{
+					//GEAR 3
+					if(gear_old != 3){
+					xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(10), 0);
+					gear_old = 3;
+					}
+				}
+
+			}
+			else
+			{
+				//MOTOR IDLE
+				gear_old = 0;
+				MOTOR_set_position_ULN2003(99);
+				xTimerChangePeriodFromISR(Timer_1, portMAX_DELAY, 0);
+			}
 			//rec_time is the actual motor speed
 		}
 	}
@@ -677,7 +787,13 @@ void vButton_IRQ(void)
 
 void vTimer_1( TimerHandle_t xTimer )
 {
-	MOTOR_left_ULN2003();
+	if(MOTOR_DIR)
+	{
+		MOTOR_left_ULN2003();
+	}else
+	{
+		MOTOR_right_ULN2003();
+	}
 }
 /* USER CODE END 4 */
 
