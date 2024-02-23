@@ -46,7 +46,6 @@
 #include"FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
-
 #include "MY_motor.h"
 
 /* USER CODE END Includes */
@@ -63,10 +62,10 @@
 TaskHandle_t motor_stepper;
 TaskHandle_t motor_servo;
 TaskHandle_t measurements;
+TaskHandle_t i2c_gather;
 
 //TIMERS
 TimerHandle_t Timer_1;
-
 
 /* USER CODE END PD */
 
@@ -79,12 +78,24 @@ TimerHandle_t Timer_1;
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
+I2C_HandleTypeDef hi2c1;
+
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-uint8_t MOTOR_DIR;
+uint8_t magnetic_module_addr = (0x1E << 1);
+
+//RAW DATA RETREIVED FROM THE SENSOR
+uint8_t 	RAW_DATA [6];
+uint16_t 	RAW_TEMP;
+
+//PROCESSED DATA
+position_t 	POSITION;
+float 		TEMPERATURE;
+
+uint8_t 	MOTOR_DIR;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,19 +106,20 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 //TASK FUNCTIONS
 void vMotorControl (void* pvParameters);
 void vServoControl (void* pvParameters);
 void vMeasurements (void* pvParameters);
+void vI2CGather (void* pvParameters);
 
 //TIMER FUNCTIONS
 void vTimer_1( TimerHandle_t xTimer );
 
 //USER FUNCTIONS
 void vButton_IRQ(void);
-extern long _map(long x, long in_min, long in_max, long out_min, long out_max);
 
 /* USER CODE END PFP */
 
@@ -124,7 +136,6 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	BaseType_t Status;
-
 
   /* USER CODE END 1 */
 
@@ -151,6 +162,7 @@ int main(void)
   MX_TIM3_Init();
   MX_ADC1_Init();
   MX_TIM4_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   Status = xTaskCreate(vMeasurements, "Measurements", 100, "MES RUNNING", 1, &measurements);
@@ -160,6 +172,9 @@ int main(void)
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(vServoControl, "SERVO_MOTOR", 100, "SERVO RUNNING", 1, &motor_servo);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(vI2CGather, "I2C Gather", 100, "I2C COMM", 1, &i2c_gather);
   configASSERT(Status == pdPASS);
 
   Timer_1 = xTimerCreate("Stepper TIM", portMAX_DELAY, pdTRUE, (void*) 0, vTimer_1);
@@ -220,8 +235,9 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC12;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_ADC12;
   PeriphClkInit.Adc12ClockSelection = RCC_ADC12PLLCLK_DIV1;
+  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -291,6 +307,54 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x2000090E;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
 
 }
 
@@ -545,14 +609,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF14_USB;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : I2C1_SCL_Pin I2C1_SDA_Pin */
-  GPIO_InitStruct.Pin = I2C1_SCL_Pin|I2C1_SDA_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
@@ -562,237 +618,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-uint16_t _meas = 0;
-void vMeasurements (void* pvParameters)
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-
-	uint16_t _old_meas_servo = 0;
-	uint16_t _old_meas_stepper = 0;
-
-	//measure threshold to deal with ADC fluctuations (servo and stepper has different sensitivity)
-	uint8_t _meas_threshold_servo = 10;
-	uint8_t _meas_threshold_stepper = 30;
-
-	uint32_t stepper_mask = 0;
-
-	//TIMER WHICH WILL BE USED TO TRIGGER THE ADC MEASUREMENTS
-	HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_4);
-
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&_meas, 1);
-
-
-	while(1)
+	if (hi2c->Instance == hi2c1.Instance)
 	{
-		//IF VALUE CHANGED
-		if(_old_meas_servo >= (_meas + _meas_threshold_servo) || _old_meas_servo < (_meas - _meas_threshold_servo))
+		//IF RAW_DATA WAS RECEIVED
+		if(hi2c->pBuffPtr == RAW_DATA+6)
 		{
-			xTaskNotify(motor_servo, _meas, eSetValueWithOverwrite);
-			_old_meas_servo = _meas;
+			POSITION = MAGNETIC_get_field(RAW_DATA);
 		}
-
-		if(_old_meas_stepper >= (_meas + _meas_threshold_stepper) || _old_meas_stepper < (_meas - _meas_threshold_stepper))
+		//IF TEMPERATURE WAS RECEIVED
+		else if(hi2c->pBuffPtr == ((uint8_t*)&(RAW_TEMP) + 2) )
 		{
-			/*
-			 * STEPPER MOTOR SETTING UP
-			 *
-			 *
-			 * 3 speeds on the left/right + stop on the middle 4094 / 7 == 585 per mode
-			 *
-			 */
-
-			//LEFT TURN
-			if(_meas < 585){
-				//speed 1 left,
-				stepper_mask = (0<<0) | (1<<3);
-			}
-			else if (_meas >=585 && _meas <1170)
-			{
-				stepper_mask = (0<<0) | (1<<2);
-				//speed 2 left
-			}
-			else if (_meas >=1170 && _meas <1755)
-			{
-				stepper_mask = (0<<0) | (1<<1);
-				//speed 3 left
-			}
-
-			//IDLE MODE
-			else if (_meas >=1850 && _meas <2200)
-			{
-				//idle motor
-				stepper_mask = 0;
-			}
-
-			//RIGHT TURN
-			else if (_meas >=2340 && _meas <2925)
-			{
-				//speed 1 right
-				stepper_mask = (1<<0) | (1<<1);
-			}
-			else if (_meas >=2925 && _meas <3510)
-			{
-				//speed 2 right
-				stepper_mask = (1<<0) | (1<<2);
-			}
-			else if (_meas >=3510 && _meas <4095)
-			{
-				//speed 3 right
-				stepper_mask = (1<<0) | (1<<3);
-			}
-
-			xTaskNotify(motor_stepper, stepper_mask, eSetBits);
-			_old_meas_stepper = _meas;
+			TEMPERATURE = MAGNETIC_get_temp(RAW_TEMP);
 		}
-
-		vTaskDelay(pdMS_TO_TICKS(5));
-	}
-}
-
-//After setting motor via Timer this task only save the actual motor speed
-void vMotorControl (void* pvParameters)
-{
-	//IF HARDWARE TIMER WILL BE USED
-	//HAL_TIM_Base_Start_IT(&htim3);
-	uint32_t rec_time;
-	uint8_t gear_old = 0;
-
-	while(1)
-	{
-		//save the motor speed
-		if(xTaskNotifyWait(0xFF,0,&rec_time,portMAX_DELAY) == pdPASS)
-		{
-			//IDLE OR NOT
-			if(rec_time)
-			{
-				//DIRECTION
-				if(rec_time & (1<<0))
-				{
-					//RIGHT
-					MOTOR_DIR = 1;
-				}else
-				{
-					//LEFT
-					MOTOR_DIR = 0;
-				}
-
-				if(rec_time & (1<<1))
-				{
-					//GEAR 1
-					if(gear_old != 1){
-					xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(1000), 0);
-					gear_old = 1;
-					}
-				}
-				else if(rec_time & (1<<2))
-				{
-					//GEAR 2
-					if(gear_old != 2){
-					xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(300), 0);
-					gear_old = 2;
-					}
-				}
-				else if(rec_time & (1<<3))
-				{
-					//GEAR 3
-					if(gear_old != 3){
-					xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(10), 0);
-					gear_old = 3;
-					}
-				}
-
-			}
-			else
-			{
-				//MOTOR IDLE
-				gear_old = 0;
-				MOTOR_set_position_ULN2003(99);
-				xTimerChangePeriodFromISR(Timer_1, portMAX_DELAY, 0);
-			}
-			//rec_time is the actual motor speed
-		}
-	}
-}
-
-void vServoControl (void* pvParameters)
-{
-
-	uint8_t _servo_position = 0;
-	uint16_t _adc_meas = 0;
-
-	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-
-	//set initial position
-	SERVO_set(&htim2, 0);
-
-	while(1)
-	{
-		if(xTaskNotifyWait(0,0,(uint32_t*)&_adc_meas, portMAX_DELAY) == pdPASS)
-		{
-			//map the gathered value to the angle value
-			_servo_position = _map(_adc_meas, 0, 4094, 0, 180);
-			//set the position
-			SERVO_set(&htim2, _servo_position);
-		}
-	}
-}
-
-void vButton_IRQ(void)
-{
-	static uint8_t mode = 0;
-	uint32_t timer = 0;
-	switch(mode)
-	{
-	case 0:
-		timer = 5;
-		xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(5), 0);
-		mode++;
-		break;
-	case 1:
-		timer = 10;
-		xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(10), 0);
-		mode++;
-		break;
-	case 2:
-		timer = 20;
-		xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(20), 0);
-		mode++;
-		break;
-	case 3:
-		timer = 100;
-		xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(100), 0);
-		mode++;
-		break;
-	case 4:
-		timer = 300;
-		xTimerChangePeriodFromISR(Timer_1, pdMS_TO_TICKS(300), 0);
-		mode++;
-		break;
-	case 5:
-		timer = portMAX_DELAY;
-		xTimerChangePeriodFromISR(Timer_1, portMAX_DELAY, 0);
-		mode++;
-		break;
-	case 6:
-		timer = 9999;
-		MOTOR_set_position_ULN2003(99);
-		xTimerChangePeriodFromISR(Timer_1, portMAX_DELAY, 0);
-		mode = 0;
-	default:
-		timer = 1000;
-		break;
-
-	}
-	xTaskNotifyFromISR(motor_stepper, timer, eSetValueWithOverwrite, 0);
-}
-
-void vTimer_1( TimerHandle_t xTimer )
-{
-	if(MOTOR_DIR)
-	{
-		MOTOR_left_ULN2003();
-	}else
-	{
-		MOTOR_right_ULN2003();
 	}
 }
 /* USER CODE END 4 */

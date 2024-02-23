@@ -31,16 +31,47 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include"FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+#include "MY_motor.h"
+#include "LSM303DLHC.h"
 
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+//TASKS HANDLERS
+extern TaskHandle_t motor_stepper;
+extern TaskHandle_t motor_servo;
+extern TaskHandle_t measurements;
+
+//TIMERS
+extern TimerHandle_t Timer_1;
+
+extern ADC_HandleTypeDef hadc1;
+extern DMA_HandleTypeDef hdma_adc1;
+
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim4;
+
+extern uint8_t MOTOR_DIR;
+
+extern I2C_HandleTypeDef hi2c1;
+
+extern void vButton_IRQ(void);
+
+extern long _map(long x, long in_min, long in_max, long out_min, long out_max);
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+
+extern uint8_t magnetic_module_addr;
+extern uint8_t RAW_DATA [6];
+extern uint16_t RAW_TEMP;
 
 /* USER CODE END EC */
 
