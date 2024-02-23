@@ -20,3 +20,4 @@
 #################### **ADVANCED PROJECTS** ####################
 
 **1. Position_draw** - Getting GPS location and printing route on the map
+**2. Motor_steering** - Steering stepper motor and servo (TIMERS) with gyroscope settings
