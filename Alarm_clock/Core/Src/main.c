@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include"FreeRTOS.h"
 #include "task.h"
+#include "HD44780.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +47,7 @@ TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 TaskHandle_t State_update_hndl;
+TaskHandle_t LCD_hndl;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,8 +57,8 @@ static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
-void state_update_fnc (void* vParameters);
-
+void state_update_task (void* vParameters);
+void LCD_task(void* vParameters);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -107,7 +109,10 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim4);
   HAL_TIM_Base_Start_IT(&htim2);
 
-  Status = xTaskCreate(state_update_fnc, "status_update", 100, 0, 1, &State_update_hndl);
+  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &State_update_hndl);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 1, &LCD_hndl);
   configASSERT(Status == pdPASS);
 
   vTaskStartScheduler();
@@ -286,12 +291,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, LCD_DATA_4_PIN_Pin|LCD_DATA_5_PIN_Pin|LCD_DATA_6_PIN_Pin|LCD_DATA_7_PIN_Pin
+                          |LCD_RS_PIN_Pin|LCD_RW_PIN_Pin|LCD_E_PIN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
   GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
@@ -332,6 +342,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF14_USB;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : LCD_DATA_4_PIN_Pin LCD_DATA_5_PIN_Pin LCD_DATA_6_PIN_Pin LCD_DATA_7_PIN_Pin
+                           LCD_RS_PIN_Pin LCD_RW_PIN_Pin LCD_E_PIN_Pin */
+  GPIO_InitStruct.Pin = LCD_DATA_4_PIN_Pin|LCD_DATA_5_PIN_Pin|LCD_DATA_6_PIN_Pin|LCD_DATA_7_PIN_Pin
+                          |LCD_RS_PIN_Pin|LCD_RW_PIN_Pin|LCD_E_PIN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   /*Configure GPIO pins : I2C1_SCL_Pin I2C1_SDA_Pin */
   GPIO_InitStruct.Pin = I2C1_SCL_Pin|I2C1_SDA_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
@@ -350,9 +369,8 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void state_update_fnc(void* vParameters)
+void state_update_task(void* vParameters)
 {
-
 	while(1)
 	{
 		xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(2000));
@@ -360,6 +378,22 @@ void state_update_fnc(void* vParameters)
 	}
 
 }
+
+void LCD_task(void* vParameters)
+{
+	lcd_init();
+
+	uint32_t command = (SET_DDRAM_ADDR)|(0x40);
+	lcd_send_command(command);
+
+	lcd_send_text("TESTING");
+
+	while(1)
+	{
+		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
+	}
+}
+
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
