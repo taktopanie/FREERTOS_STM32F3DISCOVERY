@@ -31,11 +31,22 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include"FreeRTOS.h"
+#include "task.h"
+#include "HD44780.h"
+#include "timers.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+enum push_states
+{
+	not_clicked,
+	short_click,
+	long_press,
+	double_click
+};
+
 
 /* USER CODE END ET */
 

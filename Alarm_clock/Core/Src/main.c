@@ -21,9 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include"FreeRTOS.h"
-#include "task.h"
-#include "HD44780.h"
+#include "myTasks.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,9 +43,11 @@
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
 
-/* USER CODE BEGIN PV */
-TaskHandle_t State_update_hndl;
+TaskHandle_t state_update_hndl;
 TaskHandle_t LCD_hndl;
+TimerHandle_t setup_timer_hndl;
+
+/* USER CODE BEGIN PV */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,19 +57,13 @@ static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
-void state_update_task (void* vParameters);
-void LCD_task(void* vParameters);
+//void state_update_task (void* vParameters);
+//void LCD_task(void* vParameters);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-enum push_states
-{
-	not_clicked,
-	short_click,
-	long_press,
-	double_click
-};
+
 
 uint8_t BUTTON_CLICKS = 0;
 uint8_t push_state = not_clicked;
@@ -106,14 +100,24 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start_IT(&htim4);
-  HAL_TIM_Base_Start_IT(&htim2);
 
-  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &State_update_hndl);
+  HAL_TIM_Base_Start_IT(&htim4);
+
+  //CONFIGURE THE TIMER FOR BUTTON CHECK
+  HAL_TIM_Base_Start_IT(&htim2);
+  HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_2);
+
+  //STOP THE TIMER BEFORE IRQ GENERATION
+  htim2.Instance->CR1 &= ~(1<<0);
+  htim2.Instance->CNT = 0;
+
+  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &state_update_hndl);
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 1, &LCD_hndl);
   configASSERT(Status == pdPASS);
+
+  setup_timer_hndl = xTimerCreate("SETUP TIMER", pdMS_TO_TICKS(5000), pdFALSE, (void*) 0, setup_timer_expiry);
 
   vTaskStartScheduler();
   /* USER CODE END 2 */
@@ -369,36 +373,14 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void state_update_task(void* vParameters)
-{
-	while(1)
-	{
-		xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(2000));
-		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
-	}
-
-}
-
-void LCD_task(void* vParameters)
-{
-	lcd_init();
-
-	uint32_t command = (SET_DDRAM_ADDR)|(0x40);
-	lcd_send_command(command);
-
-	lcd_send_text("TESTING");
-
-	while(1)
-	{
-		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
-	}
-}
-
-
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(htim == &htim2)
+	if(htim->Instance == TIM2)
 		{
+				if(BUTTON_CLICKS == 2){
+					push_state = double_click;
+					return;
+				}
 
 				if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0))
 				{
@@ -441,20 +423,26 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-	if(htim == &htim2)
+	if(htim->Instance == TIM2)
 	{
 		if(BUTTON_CLICKS == 1)
 		{
-			if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET) push_state = long_press;
-			else push_state = short_click;
+			xTaskNotifyFromISR(state_update_hndl,push_state,eSetValueWithOverwrite, NULL);
 
 		}else if(BUTTON_CLICKS == 2)
 		{
 			push_state = double_click;
+			xTaskNotifyFromISR(state_update_hndl,push_state,eSetValueWithOverwrite, NULL);
 		}
+
+		/*
+		 * MORE OPTIONS CAN BE ADDED HERE
+		 */
+
 	}
 
-	if(htim == &htim4)
+	//TIMER JUST FOR INDICATION -- TESTING
+	if(htim->Instance == TIM4)
 	{
 	  if(push_state == long_press)
 	  {
