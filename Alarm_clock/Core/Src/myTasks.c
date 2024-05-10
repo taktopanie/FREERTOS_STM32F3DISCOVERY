@@ -16,17 +16,61 @@ void state_update_task(void* vParameters)
 		if(xTaskNotifyWait(0,0,&State,pdMS_TO_TICKS(2000)) == pdPASS)
 		{
 			//PRINT STATE ON THE LCD
-			xTaskNotify(LCD_hndl,State,eSetValueWithOverwrite);
+			//xTaskNotify(LCD_HNDL,State,eSetValueWithOverwrite);
 
 			//ANY OPTION DIFFERENT THAN NO CLICK
 			if(State > 0)
 			{
 				xTimerStart(setup_timer_hndl, 0);
+
+				switch(State)
+					{
+					case short_click:
+						xTaskNotify(SHORT_CLICK_HNDL, 0, eNoAction);
+						break;
+					case double_click:
+						xTaskNotify(DOUBLE_CLICK_HNDL, 0, eNoAction);
+						break;
+					case long_press:
+						xTaskNotify(LONG_PRESS_HNDL, 0, eNoAction);
+						break;
+					}
+
 			}
 		}
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
 	}
 
+}
+
+void DOUBLE_CLICK_task(void* vParameters)
+{
+	while(1)
+	{
+		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
+		xTaskNotify(LCD_HNDL,double_click,eSetValueWithOverwrite);
+	}
+}
+
+void SHORT_CLICK_task(void* vParameters)
+{
+
+	while(1)
+	{
+		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
+		xTaskNotify(LCD_HNDL,short_click,eSetValueWithOverwrite);
+
+	}
+}
+
+void LONG_PRESS_task(void* vParameters)
+{
+	while(1)
+	{
+		xTaskNotifyWait(0,0,NULL,portMAX_DELAY);
+		xTaskNotify(LCD_HNDL,long_press,eSetValueWithOverwrite);
+
+	}
 }
 
 void LCD_task(void* vParameters)
@@ -72,6 +116,8 @@ void LCD_task(void* vParameters)
 	}
 }
 
+
+
 void setup_timer_expiry(TimerHandle_t xTimer)
 {
 	push_state = not_clicked;
@@ -81,5 +127,8 @@ void setup_timer_expiry(TimerHandle_t xTimer)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, DISABLE);
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
 
-	xTaskNotify(LCD_hndl,push_state,eSetValueWithOverwrite);
+	xTaskNotify(LCD_HNDL,push_state,eSetValueWithOverwrite);
 }
+
+
+

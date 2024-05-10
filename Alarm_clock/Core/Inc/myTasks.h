@@ -10,9 +10,16 @@
 
 #include "main.h"
 
-extern TaskHandle_t state_update_hndl;
-extern TaskHandle_t LCD_hndl;
 
+//TASKS
+extern TaskHandle_t STATE_UPDATE_HNDL;
+extern TaskHandle_t LCD_HNDL;
+
+extern TaskHandle_t DOUBLE_CLICK_HNDL;
+extern TaskHandle_t SHORT_CLICK_HNDL;
+extern TaskHandle_t LONG_PRESS_HNDL;
+
+//TIMERS
 extern TimerHandle_t setup_timer_hndl;
 
 extern uint8_t push_state;
@@ -20,5 +27,9 @@ extern uint8_t push_state;
 void state_update_task(void* vParameters);
 void LCD_task(void* vParameters);
 void setup_timer_expiry(TimerHandle_t xTimer);
+
+void SHORT_CLICK_task(void* vParameters);
+void DOUBLE_CLICK_task(void* vParameters);
+void LONG_PRESS_task(void* vParameters);
 
 #endif /* INC_MYTASKS_H_ */

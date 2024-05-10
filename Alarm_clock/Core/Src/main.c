@@ -43,9 +43,18 @@
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
 
-TaskHandle_t state_update_hndl;
-TaskHandle_t LCD_hndl;
+//TASK HANDLERS
+TaskHandle_t STATE_UPDATE_HNDL;
+TaskHandle_t LCD_HNDL;
+
+TaskHandle_t DOUBLE_CLICK_HNDL;
+TaskHandle_t SHORT_CLICK_HNDL;
+TaskHandle_t LONG_PRESS_HNDL;
+
+
+//TIMER HANDLERS
 TimerHandle_t setup_timer_hndl;
+
 
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -111,10 +120,20 @@ int main(void)
   htim2.Instance->CR1 &= ~(1<<0);
   htim2.Instance->CNT = 0;
 
-  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &state_update_hndl);
+  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &STATE_UPDATE_HNDL);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 1, &LCD_hndl);
+  Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 1, &LCD_HNDL);
+  configASSERT(Status == pdPASS);
+
+
+  Status = xTaskCreate(SHORT_CLICK_task, "SHORT_CLICK_task", 100, 0, 1, &SHORT_CLICK_HNDL);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(DOUBLE_CLICK_task, "DOUBLE_CLICK_task", 100, 0, 1, &DOUBLE_CLICK_HNDL);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(LONG_PRESS_task, "LONG_PRESS_task", 100, 0, 1, &LONG_PRESS_HNDL);
   configASSERT(Status == pdPASS);
 
   setup_timer_hndl = xTimerCreate("SETUP TIMER", pdMS_TO_TICKS(5000), pdFALSE, (void*) 0, setup_timer_expiry);
@@ -377,11 +396,9 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim->Instance == TIM2)
 		{
-				if(BUTTON_CLICKS == 2){
-					push_state = double_click;
-					return;
-				}
-
+			//CHECK IF LONG / SHORT CLICK
+			if(BUTTON_CLICKS == 1)
+			{
 				if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0))
 				{
 					push_state = long_press;
@@ -389,6 +406,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 				{
 					push_state = short_click;
 				}
+			}
 		}
 }
 
@@ -427,12 +445,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		if(BUTTON_CLICKS == 1)
 		{
-			xTaskNotifyFromISR(state_update_hndl,push_state,eSetValueWithOverwrite, NULL);
+			xTaskNotifyFromISR(STATE_UPDATE_HNDL,push_state,eSetValueWithOverwrite, NULL);
 
 		}else if(BUTTON_CLICKS == 2)
 		{
 			push_state = double_click;
-			xTaskNotifyFromISR(state_update_hndl,push_state,eSetValueWithOverwrite, NULL);
+			xTaskNotifyFromISR(STATE_UPDATE_HNDL,push_state,eSetValueWithOverwrite, NULL);
 		}
 
 		/*
