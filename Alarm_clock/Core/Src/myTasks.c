@@ -7,6 +7,8 @@
 
 #include "myTasks.h"
 
+uint8_t BUTTON_CLICKS = 0;
+
 void state_update_task(void* vParameters)
 {
 	uint32_t State = 0;
@@ -41,6 +43,31 @@ void state_update_task(void* vParameters)
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
 	}
 
+}
+
+void BUTTON_STATE_task(void* vParamaters)
+{
+	while(1)
+	{
+		//TODO::
+
+		//NOTIFY FROM BUTTON ISR
+		if(xTaskNotifyWait(0,0,NULL,portMAX_DELAY) == pdTRUE)
+		{
+			//IF TIMER RUNNING
+			if(xTimerIsTimerActive(BUTTON_TIMER)==pdPASS)
+			{
+				BUTTON_CLICKS++;
+			}else
+			{
+				BUTTON_CLICKS = 1;
+				xTaskNotify(STATE_UPDATE_HNDL,long_press,eSetValueWithOverwrite);
+			}
+
+
+		}
+
+	}
 }
 
 void DOUBLE_CLICK_task(void* vParameters)
