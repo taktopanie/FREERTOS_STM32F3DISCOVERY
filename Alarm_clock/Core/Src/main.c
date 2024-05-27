@@ -40,6 +40,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -47,6 +48,7 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 //void state_update_task (void* vParameters);
@@ -58,7 +60,6 @@ static void MX_GPIO_Init(void);
 TaskHandle_t STATE_UPDATE_HNDL;
 TaskHandle_t LCD_HNDL;
 
-TaskHandle_t BUTTON_STATE_HNDL;
 TaskHandle_t SHORT_CLICK_HNDL;
 TaskHandle_t DOUBLE_CLICK_HNDL;
 TaskHandle_t LONG_PRESS_HNDL;
@@ -97,16 +98,19 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+
+  //START BUTTON TIMER
+  HAL_TIM_Base_Start_IT(&htim2);
+  //TURN ON TIF
+  htim2.Instance->DIER |= (1<< TIM_DIER_TIE_Pos);
+
 
   Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &STATE_UPDATE_HNDL);
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 1, &LCD_HNDL);
-  configASSERT(Status == pdPASS);
-
-
-  Status = xTaskCreate(BUTTON_STATE_task, "BUTTON_STATE_task", 100, 0, 1, &BUTTON_STATE_HNDL);
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(SHORT_CLICK_task, "SHORT_CLICK_task", 100, 0, 1, &SHORT_CLICK_HNDL);
@@ -176,6 +180,61 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 12000;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_GATED;
+  sSlaveConfig.InputTrigger = TIM_TS_ETRF;
+  sSlaveConfig.TriggerPolarity = TIM_TRIGGERPOLARITY_NONINVERTED;
+  sSlaveConfig.TriggerPrescaler = TIM_TRIGGERPRESCALER_DIV1;
+  sSlaveConfig.TriggerFilter = 0;
+  if (HAL_TIM_SlaveConfigSynchro(&htim2, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -220,12 +279,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MISOA7_Pin */
   GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MISOA7_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -259,22 +312,42 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 6, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
-
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void HAL_TIM_TriggerCallback(TIM_HandleTypeDef *htim)
 {
+	if(push_state == not_clicked)
+	{
+		if((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) && (htim2.Instance->DIER & ( 1 << TIM_DIER_TIE_Pos)))
+		{
+			uint32_t time_val = htim2.Instance->CNT;
+			htim2.Instance->CNT = 0;
 
-	xTaskNotifyFromISR(BUTTON_STATE_HNDL, 0, eNoAction, NULL);
-	HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_12);
+			if(time_val < 500)
+			{
+				xTaskNotifyFromISR(STATE_UPDATE_HNDL, short_click, eSetValueWithOverwrite, NULL);
+				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
+			}else
+			{
+				xTaskNotifyFromISR(STATE_UPDATE_HNDL, long_press, eSetValueWithOverwrite, NULL);
+				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_SET);
+			}
+
+		}
+	}
+	if(push_state == long_press)
+	{
+		htim2.Instance->CNT = 0;
+		xTaskNotifyFromISR(LONG_PRESS_HNDL, 2, eSetBits, NULL);
+	}
+	//OTHER STATES CAN BE ADDED HERE
+
 }
+
 /* USER CODE END 4 */
 
 /**
