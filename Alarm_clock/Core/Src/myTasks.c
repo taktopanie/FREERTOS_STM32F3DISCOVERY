@@ -9,6 +9,9 @@
 
 uint8_t BUTTON_CLICKS = 0;
 
+
+uint32_t global_value = 123456;
+
 void state_update_task(void* vParameters)
 {
 	uint32_t State = 0;
@@ -82,6 +85,10 @@ void LONG_PRESS_task(void* vParameters)
 		{
 			//REFRESH THE TIMER
 			xTimerStart(setup_timer_hndl, 0);
+			global_value++;
+			xTaskNotify(LCD_HNDL,long_press,eSetValueWithOverwrite);
+			//TODO:
+			//lcd_send_command(LCD_RETURN_HOME);
 			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
 		}
 
@@ -91,10 +98,11 @@ void LONG_PRESS_task(void* vParameters)
 void LCD_task(void* vParameters)
 {
 	lcd_init();
+	char message [6];
 
 	uint32_t command = (SET_DDRAM_ADDR)|(LCD_LINE1);
 	lcd_send_command(command);
-	lcd_send_text("NOT CLICKED");
+	lcd_send_text("Press the button");
 
 	uint32_t State = 0;
 
@@ -112,7 +120,9 @@ void LCD_task(void* vParameters)
 			lcd_clear();
 			command = (SET_DDRAM_ADDR)|(LCD_LINE1);
 			lcd_send_command(command);
-			lcd_send_text("LONG PRESS");
+			itoa(global_value, message, 10);
+
+			lcd_send_text(message);
 		}else if(State == double_click)
 		{
 			lcd_clear();

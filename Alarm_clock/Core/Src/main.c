@@ -320,29 +320,32 @@ static void MX_GPIO_Init(void)
 
 void HAL_TIM_TriggerCallback(TIM_HandleTypeDef *htim)
 {
-	if(push_state == not_clicked)
+	if(htim == &htim2)
 	{
-		if((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) && (htim2.Instance->DIER & ( 1 << TIM_DIER_TIE_Pos)))
+		if(push_state == not_clicked)
 		{
-			uint32_t time_val = htim2.Instance->CNT;
-			htim2.Instance->CNT = 0;
+			if((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) && (htim2.Instance->DIER & ( 1 << TIM_DIER_TIE_Pos)))
+			{
+				uint32_t time_val = htim2.Instance->CNT;
+				htim2.Instance->CNT = 0;
 
-			if(time_val < 500)
-			{
-				xTaskNotifyFromISR(STATE_UPDATE_HNDL, short_click, eSetValueWithOverwrite, NULL);
-				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
-			}else
-			{
-				xTaskNotifyFromISR(STATE_UPDATE_HNDL, long_press, eSetValueWithOverwrite, NULL);
-				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_SET);
+				if(time_val < 500)
+				{
+					xTaskNotifyFromISR(STATE_UPDATE_HNDL, short_click, eSetValueWithOverwrite, NULL);
+					HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
+				}else
+				{
+					xTaskNotifyFromISR(STATE_UPDATE_HNDL, long_press, eSetValueWithOverwrite, NULL);
+					HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_SET);
+				}
+
 			}
-
 		}
-	}
-	if(push_state == long_press)
-	{
-		htim2.Instance->CNT = 0;
-		xTaskNotifyFromISR(LONG_PRESS_HNDL, 2, eSetBits, NULL);
+		if(push_state == long_press)
+		{
+			htim2.Instance->CNT = 0;
+			xTaskNotifyFromISR(LONG_PRESS_HNDL, 2, eSetBits, NULL);
+		}
 	}
 	//OTHER STATES CAN BE ADDED HERE
 

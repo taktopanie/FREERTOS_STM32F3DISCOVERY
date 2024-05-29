@@ -9,7 +9,7 @@
 #define INC_MYTASKS_H_
 
 #include "main.h"
-
+#include "stdlib.h"
 
 //TASKS
 extern TaskHandle_t STATE_UPDATE_HNDL;
