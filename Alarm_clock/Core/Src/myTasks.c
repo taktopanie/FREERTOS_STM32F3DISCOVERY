@@ -6,11 +6,20 @@
  */
 
 #include "myTasks.h"
+#include "stdio.h"
 
 uint8_t BUTTON_CLICKS = 0;
 
 
-uint32_t global_value = 123456;
+struct global_time
+{
+	uint16_t hours;
+	uint16_t minutes;
+	uint16_t seconds;
+
+};
+
+struct global_time TIME = {12,00,12};
 
 void state_update_task(void* vParameters)
 {
@@ -20,8 +29,6 @@ void state_update_task(void* vParameters)
 	{
 		if(xTaskNotifyWait(0,0,&State,pdMS_TO_TICKS(2000)) == pdPASS)
 		{
-			//PRINT STATE ON THE LCD
-			//xTaskNotify(LCD_HNDL,State,eSetValueWithOverwrite);
 
 			//ANY OPTION DIFFERENT THAN NO CLICK
 			if(State > 0)
@@ -76,20 +83,29 @@ void LONG_PRESS_task(void* vParameters)
 	{
 		xTaskNotifyWait(0,0xF,&status_mask,portMAX_DELAY);
 
+		//STATUS LONG_PRESS TASK INIT
 		if(status_mask & (1 << 0))
 		{
 			xTaskNotify(LCD_HNDL,long_press,eSetValueWithOverwrite);
 		}
 
+		//STATUS LONG_PRESS BUTTON PRESSED
 		if(status_mask & (1 << 1))
 		{
+			//BUTTON DEBOUNCING
+			vTaskDelay(pdMS_TO_TICKS(20));
 			//REFRESH THE TIMER
 			xTimerStart(setup_timer_hndl, 0);
-			global_value++;
+			TIME.minutes++;
 			xTaskNotify(LCD_HNDL,long_press,eSetValueWithOverwrite);
+
 			//TODO:
-			//lcd_send_command(LCD_RETURN_HOME);
+			uint32_t command = (SET_DDRAM_ADDR)|(LCD_LINE1+0x4);
+			lcd_send_command(command);
+
 			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
+			while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9) == GPIO_PIN_RESET);
+
 		}
 
 	}
@@ -98,7 +114,7 @@ void LONG_PRESS_task(void* vParameters)
 void LCD_task(void* vParameters)
 {
 	lcd_init();
-	char message [6];
+	char message [16];
 
 	uint32_t command = (SET_DDRAM_ADDR)|(LCD_LINE1);
 	lcd_send_command(command);
@@ -120,7 +136,11 @@ void LCD_task(void* vParameters)
 			lcd_clear();
 			command = (SET_DDRAM_ADDR)|(LCD_LINE1);
 			lcd_send_command(command);
-			itoa(global_value, message, 10);
+
+			//itoa(global_value, message, 10);
+
+			//TODO: FORMAT WILL BE CHECKED
+			sprintf(message, "%02d:%02d:%02d", TIME.hours, TIME.minutes, TIME.seconds);
 
 			lcd_send_text(message);
 		}else if(State == double_click)
