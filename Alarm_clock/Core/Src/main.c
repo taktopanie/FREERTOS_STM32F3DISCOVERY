@@ -64,6 +64,8 @@ TaskHandle_t SHORT_CLICK_HNDL;
 TaskHandle_t DOUBLE_CLICK_HNDL;
 TaskHandle_t LONG_PRESS_HNDL;
 
+TaskHandle_t CLOCK_TICK_HNDL;
+
 TimerHandle_t setup_timer_hndl;
 TimerHandle_t BUTTON_TIMER;
 
@@ -120,6 +122,9 @@ int main(void)
   configASSERT(Status == pdPASS);
 
   Status = xTaskCreate(LONG_PRESS_task, "LONG_PRESS_task", 100, 0, 1, &LONG_PRESS_HNDL);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(CLOCK_TICK_task, "CLOCK_TICK_task", 100, 0, 4, &CLOCK_TICK_HNDL);
   configASSERT(Status == pdPASS);
 
   setup_timer_hndl = xTimerCreate("SETUP TIMER", pdMS_TO_TICKS(5000), pdFALSE, (void*) 0, setup_timer_expiry);

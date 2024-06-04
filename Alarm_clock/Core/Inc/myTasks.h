@@ -19,6 +19,8 @@ extern TaskHandle_t DOUBLE_CLICK_HNDL;
 extern TaskHandle_t SHORT_CLICK_HNDL;
 extern TaskHandle_t LONG_PRESS_HNDL;
 
+extern TaskHandle_t CLOCK_TICK_HNDL;
+
 //TIMERS
 extern TimerHandle_t setup_timer_hndl;
 extern TimerHandle_t BUTTON_TIMER;
@@ -33,6 +35,10 @@ void SHORT_CLICK_task(void* vParameters);
 void DOUBLE_CLICK_task(void* vParameters);
 void LONG_PRESS_task(void* vParameters);
 
+void CLOCK_TICK_task(void* vParameters);
+
+//private functions
+void _CLOCK_second_increment(void);
 
 
 

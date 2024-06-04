@@ -19,7 +19,7 @@ struct global_time
 
 };
 
-struct global_time TIME = {12,00,12};
+struct global_time TIME = {13,35,00};
 
 void state_update_task(void* vParameters)
 {
@@ -96,11 +96,11 @@ void LONG_PRESS_task(void* vParameters)
 			vTaskDelay(pdMS_TO_TICKS(20));
 			//REFRESH THE TIMER
 			xTimerStart(setup_timer_hndl, 0);
-			TIME.minutes++;
+			_CLOCK_second_increment();
 			xTaskNotify(LCD_HNDL,long_press,eSetValueWithOverwrite);
 
 			//TODO:
-			uint32_t command = (SET_DDRAM_ADDR)|(LCD_LINE1+0x4);
+			uint32_t command = (SET_DDRAM_ADDR)|(LCD_LINE1+0x7);
 			lcd_send_command(command);
 
 			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
@@ -161,6 +161,41 @@ void LCD_task(void* vParameters)
 	}
 }
 
+
+void CLOCK_TICK_task(void* vParameters)
+{
+	TickType_t xLastWakeTime;
+	// Initialise the xLastWakeTime variable with the current time.
+	xLastWakeTime = xTaskGetTickCount();
+
+	while(1)
+	{
+		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+		_CLOCK_second_increment();
+	}
+}
+
+void _CLOCK_second_increment(void)
+{
+	TIME.seconds++;
+
+	if(TIME.seconds == 60)
+	{
+		TIME.minutes++;
+		TIME.seconds = 0;
+
+		if(TIME.minutes == 60)
+		{
+			TIME.hours++;
+			TIME.minutes = 0;
+			if(TIME.hours == 24)
+			{
+				TIME.hours = 0;
+			}
+
+		}
+	}
+}
 
 
 void setup_timer_expiry(TimerHandle_t xTimer)
