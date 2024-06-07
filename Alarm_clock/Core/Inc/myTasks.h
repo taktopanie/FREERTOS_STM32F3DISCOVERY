@@ -14,6 +14,7 @@
 //TASKS
 extern TaskHandle_t STATE_UPDATE_HNDL;
 extern TaskHandle_t LCD_HNDL;
+extern TaskHandle_t DS3231_HNDL;
 
 extern TaskHandle_t DOUBLE_CLICK_HNDL;
 extern TaskHandle_t SHORT_CLICK_HNDL;
@@ -27,8 +28,12 @@ extern TimerHandle_t BUTTON_TIMER;
 
 extern uint8_t push_state;
 
+extern I2C_HandleTypeDef hi2c1;
+
+
 void state_update_task(void* vParameters);
 void LCD_task(void* vParameters);
+void DS3231_task(void* vParameters);
 void setup_timer_expiry(TimerHandle_t xTimer);
 
 void SHORT_CLICK_task(void* vParameters);

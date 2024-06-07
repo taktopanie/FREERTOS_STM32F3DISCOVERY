@@ -7,6 +7,7 @@
 
 #include "myTasks.h"
 #include "stdio.h"
+#include "DS3231.h"
 
 uint8_t BUTTON_CLICKS = 0;
 
@@ -19,7 +20,7 @@ struct global_time
 
 };
 
-struct global_time TIME = {13,35,00};
+struct global_time TIME = {18,00,00};
 
 void state_update_task(void* vParameters)
 {
@@ -117,7 +118,9 @@ void LCD_task(void* vParameters)
 	char message [16];
 
 	uint32_t command = (SET_DDRAM_ADDR)|(LCD_LINE1);
+
 	lcd_send_command(command);
+
 	lcd_send_text("Press the button");
 
 	uint32_t State = 0;
@@ -161,6 +164,23 @@ void LCD_task(void* vParameters)
 	}
 }
 
+void DS3231_task(void* vParameters)
+{
+	DS3231_Time_t timer_time = {0,0,0,0,0,0,0};
+	while(1)
+	{
+		xTaskNotifyWait(0,0,NULL, portMAX_DELAY);
+
+		//RETREIVE THE VALUES FROM RTC
+		timer_time = DS3231_get_time(&hi2c1);
+
+		//COPY THE VALUES TO GLOBAL VARIABLE
+		TIME.hours = timer_time.time_hr;
+		TIME.minutes = timer_time.time_min;
+		TIME.seconds = timer_time.time_sec;
+
+	}
+}
 
 void CLOCK_TICK_task(void* vParameters)
 {
@@ -171,6 +191,7 @@ void CLOCK_TICK_task(void* vParameters)
 	while(1)
 	{
 		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+		xTaskNotify(DS3231_HNDL, 0, eNoAction);
 		_CLOCK_second_increment();
 	}
 }

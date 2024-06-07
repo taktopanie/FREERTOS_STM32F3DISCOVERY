@@ -40,6 +40,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
+RTC_HandleTypeDef hrtc;
+
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
@@ -49,6 +53,8 @@ TIM_HandleTypeDef htim2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 //void state_update_task (void* vParameters);
@@ -59,6 +65,7 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN 0 */
 TaskHandle_t STATE_UPDATE_HNDL;
 TaskHandle_t LCD_HNDL;
+TaskHandle_t DS3231_HNDL;
 
 TaskHandle_t SHORT_CLICK_HNDL;
 TaskHandle_t DOUBLE_CLICK_HNDL;
@@ -101,6 +108,8 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
+  MX_I2C1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
   //START BUTTON TIMER
@@ -109,27 +118,32 @@ int main(void)
   htim2.Instance->DIER |= (1<< TIM_DIER_TIE_Pos);
 
 
-  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 1, &STATE_UPDATE_HNDL);
+  Status = xTaskCreate(state_update_task, "status_update", 100, 0, 3, &STATE_UPDATE_HNDL);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 2, &LCD_HNDL);
+  Status = xTaskCreate(LCD_task, "LCD_TASK", 100, 0, 3, &LCD_HNDL);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(SHORT_CLICK_task, "SHORT_CLICK_task", 100, 0, 1, &SHORT_CLICK_HNDL);
+  Status = xTaskCreate(DS3231_task, "DS3231_TASK", 100, 0, 1, &DS3231_HNDL);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(DOUBLE_CLICK_task, "DOUBLE_CLICK_task", 100, 0, 1, &DOUBLE_CLICK_HNDL);
+  Status = xTaskCreate(SHORT_CLICK_task, "SHORT_CLICK_task", 100, 0, 2, &SHORT_CLICK_HNDL);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(LONG_PRESS_task, "LONG_PRESS_task", 100, 0, 1, &LONG_PRESS_HNDL);
+  Status = xTaskCreate(DOUBLE_CLICK_task, "DOUBLE_CLICK_task", 100, 0, 2, &DOUBLE_CLICK_HNDL);
   configASSERT(Status == pdPASS);
 
-  Status = xTaskCreate(CLOCK_TICK_task, "CLOCK_TICK_task", 100, 0, 4, &CLOCK_TICK_HNDL);
+  Status = xTaskCreate(LONG_PRESS_task, "LONG_PRESS_task", 100, 0, 2, &LONG_PRESS_HNDL);
+  configASSERT(Status == pdPASS);
+
+  Status = xTaskCreate(CLOCK_TICK_task, "CLOCK_TICK_task", 100, 0, 1, &CLOCK_TICK_HNDL);
   configASSERT(Status == pdPASS);
 
   setup_timer_hndl = xTimerCreate("SETUP TIMER", pdMS_TO_TICKS(5000), pdFALSE, (void*) 0, setup_timer_expiry);
 
   BUTTON_TIMER =  xTimerCreate("BUTTON_TIMER", pdMS_TO_TICKS(5000), pdFALSE, (void*) 0, NULL);
+
+  //SEMAPHORE TODO: FOR CLOCK INCREMENTING
 
 
   vTaskStartScheduler();
@@ -154,13 +168,15 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12;
@@ -182,6 +198,96 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_RTC;
+  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x2000090E;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
 }
 
 /**
@@ -308,14 +414,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : I2C1_SCL_Pin I2C1_SDA_Pin */
-  GPIO_InitStruct.Pin = I2C1_SCL_Pin|I2C1_SDA_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB9 */
   GPIO_InitStruct.Pin = GPIO_PIN_9;
