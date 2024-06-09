@@ -57,8 +57,6 @@ static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
-//void state_update_task (void* vParameters);
-//void LCD_task(void* vParameters);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -77,6 +75,8 @@ TimerHandle_t setup_timer_hndl;
 TimerHandle_t BUTTON_TIMER;
 
 uint8_t push_state = not_clicked;
+
+
 /* USER CODE END 0 */
 
 /**
@@ -469,6 +469,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			xTaskNotifyFromISR(LONG_PRESS_HNDL, 2, eSetBits, NULL);
 		}
 	}
+}
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	I2C_DATA_RECEIVED = 1;
 }
 /* USER CODE END 4 */
 

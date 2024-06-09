@@ -47,7 +47,6 @@ enum push_states
 	double_click
 };
 
-
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

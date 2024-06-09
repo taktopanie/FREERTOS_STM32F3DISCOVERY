@@ -30,6 +30,7 @@ extern uint8_t push_state;
 
 extern I2C_HandleTypeDef hi2c1;
 
+extern volatile uint8_t I2C_DATA_RECEIVED;
 
 void state_update_task(void* vParameters);
 void LCD_task(void* vParameters);

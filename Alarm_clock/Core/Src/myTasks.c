@@ -11,7 +11,6 @@
 
 uint8_t BUTTON_CLICKS = 0;
 
-
 struct global_time
 {
 	uint16_t hours;
@@ -172,7 +171,7 @@ void DS3231_task(void* vParameters)
 		xTaskNotifyWait(0,0,NULL, portMAX_DELAY);
 
 		//RETREIVE THE VALUES FROM RTC
-		timer_time = DS3231_get_time(&hi2c1);
+		timer_time = DS3231_get_time_IT(&hi2c1);
 
 		//COPY THE VALUES TO GLOBAL VARIABLE
 		TIME.hours = timer_time.time_hr;
@@ -185,7 +184,7 @@ void DS3231_task(void* vParameters)
 void CLOCK_TICK_task(void* vParameters)
 {
 	TickType_t xLastWakeTime;
-	// Initialise the xLastWakeTime variable with the current time.
+	// Initialize the xLastWakeTime variable with the current time.
 	xLastWakeTime = xTaskGetTickCount();
 
 	while(1)
@@ -232,6 +231,7 @@ void setup_timer_expiry(TimerHandle_t xTimer)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, DISABLE);
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
 
+	//TODO: RESET BUTTON TIMER CNT
 	xTaskNotify(LCD_HNDL,push_state,eSetValueWithOverwrite);
 }
 
