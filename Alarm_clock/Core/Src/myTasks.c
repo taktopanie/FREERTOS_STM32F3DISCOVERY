@@ -6,16 +6,15 @@
  */
 
 #include "myTasks.h"
-#include "stdio.h"
 #include "DS3231.h"
 
 uint8_t BUTTON_CLICKS = 0;
 
 struct global_time
 {
-	uint16_t hours;
-	uint16_t minutes;
-	uint16_t seconds;
+	uint8_t hours;
+	uint8_t minutes;
+	uint8_t seconds;
 
 };
 
@@ -139,12 +138,45 @@ void LCD_task(void* vParameters)
 			command = (SET_DDRAM_ADDR)|(LCD_LINE1);
 			lcd_send_command(command);
 
-			//itoa(global_value, message, 10);
+			//////////////////// VERSION 1.0 - will be upgraded
+			struct global_time _time_local_copy = {TIME.hours,\
+							TIME.minutes, TIME.seconds};
 
-			//TODO: FORMAT WILL BE CHECKED
-			sprintf(message, "%02d:%02d:%02d", TIME.hours, TIME.minutes, TIME.seconds);
+			itoa(_time_local_copy.hours, message, 10);
+			if(_time_local_copy.hours > 10)
+			{
+				lcd_send_text(message);
+			}else
+			{
+				lcd_send_text("0");
+				lcd_send_text(message);
+			}
 
-			lcd_send_text(message);
+			lcd_send_text(":");
+
+			itoa(_time_local_copy.minutes, message, 10);
+			if(_time_local_copy.minutes > 10)
+			{
+				lcd_send_text(message);
+			}else
+			{
+				lcd_send_text("0");
+				lcd_send_text(message);
+			}
+
+			lcd_send_text(":");
+
+			itoa(_time_local_copy.seconds, message, 10);
+			if(_time_local_copy.seconds > 10)
+			{
+				lcd_send_text(message);
+			}else
+			{
+				lcd_send_text("0");
+				lcd_send_text(message);
+			}
+			///////////////////////////////////////////////////
+
 		}else if(State == double_click)
 		{
 			lcd_clear();
@@ -191,7 +223,7 @@ void CLOCK_TICK_task(void* vParameters)
 	{
 		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
 		xTaskNotify(DS3231_HNDL, 0, eNoAction);
-		_CLOCK_second_increment();
+		//_CLOCK_second_increment();
 	}
 }
 
@@ -216,6 +248,7 @@ void _CLOCK_second_increment(void)
 		}
 	}
 }
+
 
 
 void setup_timer_expiry(TimerHandle_t xTimer)
