@@ -35,6 +35,7 @@ extern "C" {
 #include "task.h"
 #include "HD44780.h"
 #include "timers.h"
+#include "semphr.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

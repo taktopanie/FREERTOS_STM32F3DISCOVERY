@@ -71,6 +71,8 @@ TaskHandle_t CLOCK_TICK_HNDL;
 TimerHandle_t setup_timer_hndl;
 TimerHandle_t BUTTON_TIMER;
 
+xSemaphoreHandle xClock_increment;
+
 uint8_t push_state = not_clicked;
 
 
@@ -140,7 +142,8 @@ int main(void)
   BUTTON_TIMER =  xTimerCreate("BUTTON_TIMER", pdMS_TO_TICKS(5000), pdFALSE, (void*) 0, NULL);
 
   //SEMAPHORE TODO: FOR CLOCK INCREMENTING
-
+  xClock_increment = xSemaphoreCreateBinary();
+  configASSERT(xClock_increment != NULL);
 
   vTaskStartScheduler();
   /* USER CODE END 2 */
@@ -413,6 +416,7 @@ void HAL_TIM_TriggerCallback(TIM_HandleTypeDef *htim)
 
 			}
 		}
+		//TODO: PROLONG TIMER IF BUTTON PUSHED AGAIN -- TO CHECK IN DEBUG MODE
 
 	}
 

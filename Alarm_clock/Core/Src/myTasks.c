@@ -91,8 +91,11 @@ void LONG_PRESS_task(void* vParameters)
 		//STATUS LONG_PRESS BUTTON PRESSED
 		if(status_mask & (1 << 1))
 		{
+			xSemaphoreTake(xClock_increment, 0);
+
 			//BUTTON DEBOUNCING
 			vTaskDelay(pdMS_TO_TICKS(20));
+
 			//REFRESH THE TIMER
 			xTimerStart(setup_timer_hndl, 0);
 			_CLOCK_second_increment();
@@ -198,9 +201,13 @@ void LCD_task(void* vParameters)
 void DS3231_task(void* vParameters)
 {
 	DS3231_Time_t timer_time = {0,0,0,0,0,0,0};
+	xSemaphoreGive(xClock_increment);
 	while(1)
 	{
 		xTaskNotifyWait(0,0,NULL, portMAX_DELAY);
+
+		//WAIT FOR SEMAPHORE FOREVER - avoid conflict with time incrementing
+		xSemaphoreTake(xClock_increment, portMAX_DELAY);
 
 		//RETREIVE THE VALUES FROM RTC
 		timer_time = DS3231_get_time_IT(&hi2c1);
@@ -210,6 +217,7 @@ void DS3231_task(void* vParameters)
 		TIME.minutes = timer_time.time_min;
 		TIME.seconds = timer_time.time_sec;
 
+		xSemaphoreGive(xClock_increment);
 	}
 }
 
@@ -264,8 +272,13 @@ void setup_timer_expiry(TimerHandle_t xTimer)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, DISABLE);
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
 
+	xSemaphoreGive(xClock_increment);
+
 	//TODO: RESET BUTTON TIMER CNT
+
 	xTaskNotify(LCD_HNDL,push_state,eSetValueWithOverwrite);
+
+
 }
 
 

@@ -32,6 +32,8 @@ extern I2C_HandleTypeDef hi2c1;
 
 extern volatile uint8_t I2C_DATA_RECEIVED;
 
+extern xSemaphoreHandle xClock_increment;
+
 void state_update_task(void* vParameters);
 void LCD_task(void* vParameters);
 void DS3231_task(void* vParameters);
