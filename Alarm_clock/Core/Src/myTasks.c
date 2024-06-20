@@ -20,6 +20,8 @@ struct global_time
 
 struct global_time TIME = {18,00,00};
 
+uint8_t _time_change = 0;
+
 void state_update_task(void* vParameters)
 {
 	uint32_t State = 0;
@@ -237,6 +239,7 @@ void CLOCK_TICK_task(void* vParameters)
 
 void _CLOCK_second_increment(void)
 {
+	_time_change = 1;
 	TIME.seconds++;
 
 	if(TIME.seconds == 60)
@@ -271,6 +274,12 @@ void setup_timer_expiry(TimerHandle_t xTimer)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, DISABLE);
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, DISABLE);
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
+
+	if(_time_change)
+	{
+		DS3231_Time_t timer_time = {TIME.hours,TIME.minutes,TIME.seconds,0,0,0,0};
+		DS3231_set_time(&hi2c1,timer_time);
+	}
 
 	xSemaphoreGive(xClock_increment);
 
